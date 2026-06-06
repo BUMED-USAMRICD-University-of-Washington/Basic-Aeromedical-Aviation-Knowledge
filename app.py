@@ -24,7 +24,8 @@ model_choice = st.sidebar.radio(
         "Planetary Cloud Corridor Engine", 
         "12-Month Future Calendar Arc", 
         "Cloud Radiative Flux Balance",
-        "Rossby Wave Planetary Dynamics"
+        "Rossby Wave Planetary Dynamics",
+        "Aircraft Takeoff Weight Optimization"
     ]
 )
 
@@ -59,3 +60,6 @@ elif model_choice == "Cloud Radiative Flux Balance":
 elif model_choice == "Rossby Wave Planetary Dynamics":
     import rossby_model
     rossby_model.run_rossby_layer()
+elif model_choice == "Aircraft Takeoff Weight Optimization":
+    import aircraft_perf
+    aircraft_perf.run_performance_layer()
