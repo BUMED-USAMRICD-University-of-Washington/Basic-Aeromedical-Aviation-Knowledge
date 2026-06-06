@@ -23,7 +23,8 @@ model_choice = st.sidebar.radio(
         "Lunar Path & Synodic Log", 
         "Planetary Cloud Corridor Engine", 
         "12-Month Future Calendar Arc", 
-        "Cloud Radiative Flux Balance"
+        "Cloud Radiative Flux Balance",
+        "Rossby Wave Planetary Dynamics"
     ]
 )
 
@@ -55,3 +56,6 @@ elif model_choice == "12-Month Future Calendar Arc":
 elif model_choice == "Cloud Radiative Flux Balance":
     import radiation_model
     radiation_model.run_radiation_layer()
+elif model_choice == "Rossby Wave Planetary Dynamics":
+    import rossby_model
+    rossby_model.run_rossby_layer()
