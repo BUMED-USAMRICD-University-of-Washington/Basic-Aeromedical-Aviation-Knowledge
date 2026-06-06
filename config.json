@@ -46,3 +46,28 @@
     }
   }
 }
+{
+  "nws_sensor_registry": {
+    "NYC": {
+      "station_name": "Central Park",
+      "icao": "KNYC",
+      "latitude": 40.77889,
+      "longitude": -73.96917,
+      "elevation_ft": 154
+    },
+    "CHI": {
+      "station_name": "O'Hare International Airport",
+      "icao": "KORD",
+      "latitude": 41.97972,
+      "longitude": -87.90444,
+      "elevation_ft": 666
+    },
+    "PHX": {
+      "station_name": "Sky Harbor International Airport",
+      "icao": "KPHX",
+      "latitude": 33.4278,
+      "longitude": -112.00347,
+      "elevation_ft": 1135
+    }
+  }
+}
