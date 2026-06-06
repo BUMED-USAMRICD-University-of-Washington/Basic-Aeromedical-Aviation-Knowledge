@@ -25,7 +25,8 @@ model_choice = st.sidebar.radio(
         "12-Month Future Calendar Arc", 
         "Cloud Radiative Flux Balance",
         "Rossby Wave Planetary Dynamics",
-        "Aircraft Takeoff Weight Optimization"
+        "Aircraft Takeoff Weight Optimization",
+        "Aviation Physics & Dynamics"
     ]
 )
 
@@ -63,3 +64,6 @@ elif model_choice == "Rossby Wave Planetary Dynamics":
 elif model_choice == "Aircraft Takeoff Weight Optimization":
     import aircraft_perf
     aircraft_perf.run_performance_layer()
+elif model_choice == "Aviation Physics & Dynamics":
+    import aviation_physics
+    aviation_physics.run_physics_layer()
