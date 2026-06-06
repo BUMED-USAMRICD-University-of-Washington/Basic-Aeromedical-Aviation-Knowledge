@@ -19,6 +19,10 @@ model_choice = st.sidebar.radio(
     "Choose Atmospheric Model Layer:",
     ["San Francisco (SFO / KMUX)", "Atlanta Spikes (ATL / KFFC)", "Lunar Path & Synodic Log"]
 )
+model_choice = st.sidebar.radio(
+    "Choose Atmospheric Model Layer:",
+    ["San Francisco (SFO / KMUX)", "Atlanta Spikes (ATL / KFFC)", "Lunar Path & Synodic Log", "Planetary Cloud Corridor Engine"]
+)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📖 Global Variable Mapping Reference")
@@ -39,3 +43,6 @@ elif model_choice == "Atlanta Spikes (AITA)":
 elif model_choice == "Lunar Path & Synodic Log":
     import lunar_model
     lunar_model.run_lunar_layer()
+elif model_choice == "Planetary Cloud Corridor Engine":
+    import cloud_model
+    cloud_model.run_cloud_layer()
