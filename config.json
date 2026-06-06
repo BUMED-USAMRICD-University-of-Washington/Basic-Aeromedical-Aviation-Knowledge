@@ -1,0 +1,7 @@
+{
+  "global_registry": {
+    "delta_t_station": 5.5,
+    "tau_crit": 1000.0,
+    "z_crit": 1000.0
+  }
+}
