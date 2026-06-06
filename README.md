@@ -35,7 +35,7 @@ Accounts for macro-scale atmospheric tidal compression and synodic 29.53-day mon
 
 To maintain normalization across all scripts, the repository uses a strict schema. When configuring local constants or a `config.json` file, refer to the following variable definitions:
 
-| Script Parameter | Physics / Meteorological Definition | NWS Alignment Rule |
+| Script Parameter | Physics / Meteorological Definition | Alignment Rule |
 | :--- | :--- | :--- |
 | `\Delta T_{\text{station}}` | Localized spatial sensor offset constant. | Adjusts for the specific microclimatic pocket of the NWS COOP/ASOS platform relative to the runway. |
 | `\Theta(x)` | Heaviside step function switch ($1$ or $0$). | Activates or dampens localized microclimate triggers based on boundary rules. |
