@@ -17,19 +17,14 @@ This dashboard houses predictive models configured to simulate Climatological Re
 st.sidebar.header("📁 Navigation & Model Selection")
 model_choice = st.sidebar.radio(
     "Choose Atmospheric Model Layer:",
-    ["San Francisco (SFO / KMUX)", "Atlanta Spikes (ATL / KFFC)", "Lunar Path & Synodic Log"]
-)
-model_choice = st.sidebar.radio(
-    "Choose Atmospheric Model Layer:",
-    ["San Francisco (SFO / KMUX)", "Atlanta Spikes (ATL / KFFC)", "Lunar Path & Synodic Log", "Planetary Cloud Corridor Engine"]
-)
-model_choice = st.sidebar.radio(
-    "Choose Atmospheric Model Layer:",
-    ["San Francisco (SFO / KMUX)", "Atlanta Spikes (ATL / KFFC)", "Lunar Path & Synodic Log", "Planetary Cloud Corridor Engine", "12-Month Future Calendar Arc"]
-)
-model_choice = st.sidebar.radio(
-    "Choose Atmospheric Model Layer:",
-    ["San Francisco (SFO / KMUX)", "Atlanta Spikes (ATL / KFFC)", "Lunar Path & Synodic Log", "Planetary Cloud Corridor Engine", "12-Month Future Calendar Arc", "Cloud Radiative Flux Balance"]
+    [
+        "San Francisco (SFO / KMUX)", 
+        "Atlanta Spikes (ATL / KFFC)", 
+        "Lunar Path & Synodic Log", 
+        "Planetary Cloud Corridor Engine", 
+        "12-Month Future Calendar Arc", 
+        "Cloud Radiative Flux Balance"
+    ]
 )
 
 st.sidebar.markdown("---")
