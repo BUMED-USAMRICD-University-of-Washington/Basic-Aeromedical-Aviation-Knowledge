@@ -37,7 +37,7 @@ To maintain normalization across all scripts, the repository uses a strict schem
 
 | Script Parameter | Physics / Meteorological Definition | Alignment Rule |
 | :--- | :--- | :--- |
-| `\Delta T_{\text{station}}` | Localized spatial sensor offset constant. | Adjusts for the specific microclimatic pocket of the NWS COOP/ASOS platform relative to the runway. |
+| `\Delta T_{\text{station}}` | Localized spatial sensor offset constant. | Adjusts for the specific microclimatic pocket of the weather station relative to the runway. |
 | `\Theta(x)` | Heaviside step function switch ($1$ or $0$). | Activates or dampens localized microclimate triggers based on boundary rules. |
 | `\tau_{\text{crit}}` / `\tau` | Physical atmospheric boundary thresholds. | Represents the tipping bounds where the onshore pump stalls or cloud decks hit 100% saturation. |
 | `z_{\text{marine}}` / `z_{\text{inv}}` | Height of the marine boundary / inversion layer. | Used to determine rapid fog burn-off windows or coastal lifting limits. |
