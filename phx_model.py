@@ -11,6 +11,13 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+    
 def run_phx_layer(telemetry_override=None):
     st.header("🏜️ Phoenix (PHX / KIWA Area) Thermal Mass Retention Model")
     st.markdown(r"### Equation: $T_{\text{PHX}}(t) = T_{\text{desert}} + \Delta T_{\text{uhi\_max}} \cdot \left(1 - \exp\left(-\frac{t}{\tau_{\text{thermal}}}\right)\right) + \Delta T_{\text{station}}$")
