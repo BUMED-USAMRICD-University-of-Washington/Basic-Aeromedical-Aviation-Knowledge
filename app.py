@@ -2,6 +2,23 @@ import streamlit as st
 import live_telemetry
 import ai_pirep
 
+# Inside your main application loop
+def guidance_loop(aircraft_state, waypoint):
+    # 1. Sense acceleration/motion
+    accel = get_sensors_accelerometer() 
+    current_force = calculate_force_vectors(accel, aircraft_state.mass)
+    
+    # 2. Recalculate if Dynamic Mode is ON
+    if flight_computer.dynamic:
+        commands = flight_computer.calculate_required_attitude(
+            aircraft_state.heading, 
+            waypoint.heading, 
+            waypoint.elevation,
+            aircraft_state.altitude,
+            aircraft_state.ground_speed
+        )
+        return commands
+        
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Basic Aviation Knowledge", layout="wide")
 
