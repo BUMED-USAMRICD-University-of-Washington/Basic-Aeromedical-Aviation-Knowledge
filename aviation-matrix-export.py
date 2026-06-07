@@ -3,7 +3,7 @@ from datetime import datetime
 import numpy as np
 
 
-def run_multi_scenario_matrix_export():
+def run_multi_scenario_matrix_export(telemetry_override=None):
     print("=================================================================")
     print("     AVIATION PERFORMANCE SPREADSHEET COMPILING ENGINE          ")
     print("=================================================================")
