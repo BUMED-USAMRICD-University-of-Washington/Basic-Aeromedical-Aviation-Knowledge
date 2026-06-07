@@ -1,3 +1,4 @@
+import multiprocessing as mp
 # --- PRIMARY ENGINE: [Model Name] ---
 import streamlit as st
 import numpy as np
