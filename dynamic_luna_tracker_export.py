@@ -1,5 +1,4 @@
 # --- PRIMARY ENGINE: [Model Name] ---
-import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,6 +7,7 @@ import astropy.coordinates as coord
 import astropy.units as u
 from astropy.time import Time
 import csv
+import streamlit as st
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
 import aviation_physics        # Core math
