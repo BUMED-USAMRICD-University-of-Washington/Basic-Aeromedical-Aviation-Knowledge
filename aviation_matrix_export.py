@@ -188,6 +188,7 @@ def run_multi_scenario_matrix_export(telemetry_override=None):
 
     print(f"=================================================================")
     print(f"[Success] Combined multi-scenario log sheet successfully built.")
+    import multiprocessing as mp
     print(f"File Saved to Workspace Path: '{filename}'")
     print(f"Total Rows Compiled:        {total_minutes} data entries")
     print("=================================================================")
