@@ -6,7 +6,7 @@ import pynmea2
 import time
 import os
 
-def get_live_position(com_port="/dev/ttyUSB0", baudrate=9600):
+def get_live_position(telemetry_override=None, com_port="/dev/ttyUSB0", baudrate=9600):
     """
     Optimized for Pydroid/Android. Uses an aggressive timeout and 
     checks for device presence before attempting to stream data.
