@@ -3,6 +3,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+    
 def run_rossby_layer(telemetry_override=None):
     st.header("🌊 Rossby Wave Phase Speed & Jet Stream Configuration Engine")
     st.markdown(r"### Mathematical Core Planetary Dynamics Engine:")
