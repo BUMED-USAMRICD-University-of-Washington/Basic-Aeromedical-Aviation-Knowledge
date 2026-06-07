@@ -1,6 +1,19 @@
 import streamlit as st
 import pandas as pd
 
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
 def run_atl_layer(telemetry_override=None):
     st.header("🍑 Atlanta Spikes (ATL / KFFC Area) Local Temperature Tendency")
     st.markdown(r"### Equation: $\frac{\partial T}{\partial t} = -\vec{V} \cdot \nabla T + \left(\frac{\alpha}{c_p}\right)\omega + \frac{J}{c_p}$")
