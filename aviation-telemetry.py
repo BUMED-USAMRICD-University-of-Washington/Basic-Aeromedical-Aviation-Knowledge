@@ -2,6 +2,7 @@ import numpy as np
 
 
 def simulate_runway_performance_log(
+    telemetry_override=None,
     initial_temp=26.0,
     initial_dew=16.0,
     base_wind_mph=8.0,
