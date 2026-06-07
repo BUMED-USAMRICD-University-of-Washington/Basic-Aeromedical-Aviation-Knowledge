@@ -1,5 +1,15 @@
-import streamlit as st
+# --- PRIMARY ENGINE: [Model Name] ---
+import numpy as np
 import pandas as pd
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
+import streamlit as st
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import astropy.coordinates as coord
