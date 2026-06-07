@@ -1,6 +1,6 @@
 import numpy as np
 
-def calculate_icing_accretion(temp_c, rh_pct, rainfall_mm_hr, elevation_m, wind_mph=30.0):
+def calculate_icing_accretion(telemetry_override=None, temp_c, rh_pct, rainfall_mm_hr, elevation_m, wind_mph=30.0):
     """Solves the coupled mass collection and thermodynamic freezing equations."""
     # 1. Core Physical Constants
     L_f = 3.34e5  # Latent heat of fusion for water (J/kg)
