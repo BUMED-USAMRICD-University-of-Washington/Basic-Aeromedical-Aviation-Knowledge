@@ -1,12 +1,12 @@
 # cloud_model.py
 # Calculates Cloud Thermodynamic Filtration & Lagrangian Trajectories for NWS Prediction
 
-# --- PRIMARY ENGINE: [Model Name] ---
-import numpy as np
+# --- PRIMARY ENGINE: Cloud Thermodynamics ---
 import pandas as pd
 import matplotlib.pyplot as plt
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
+import telemetry_link          # NEW: Integrated Centralized Data Bus
 import aviation_physics        # Core math
 import aviation_telemetry      # Data flow
 import aircraft_perf           # Performance calculations
@@ -14,7 +14,15 @@ import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
 
-def calculate_surface_energy_balance(telemetry_override=None, t_rural, lwp, s_downwelling, t_atm, t_base, is_daytime=True):
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
+
+def calculate_surface_energy_balance(telemetry_override=None, t_rural=15.0, lwp=0.0, s_downwelling=800.0, t_atm=5.0, t_base=8.0, is_daytime=True):
     """
     Calculates the net surface heat flux and temperature adjustment under cloud filtration.
     Equations:
@@ -63,6 +71,7 @@ def calculate_surface_energy_balance(telemetry_override=None, t_rural, lwp, s_do
         "t_final_predicted": t_final
     }
 
+
 def calculate_lagrangian_trajectory(pdo_index, amo_index):
     """
     Solves the 2x2 steering matrix for trans-continental cloud paths based on ocean teleconnections.
@@ -79,3 +88,81 @@ def calculate_lagrangian_trajectory(pdo_index, amo_index):
         "U_zonal": u_zonal,          # West-to-East Steering Velocity
         "V_meridional": v_meridional # North-to-South Steering Velocity
     }
+
+
+def run_cloud_layer(telemetry_override=None):
+    """
+    Main orchestration function. Extracts live telemetry, runs the high-performance
+    physics simulation, and reports the findings directly to the Boeing JSON payload.
+    """
+    print("☁️ Running Cloud Thermodynamic & Trajectory Model...")
+    
+    # 1. Default Inputs (Can be replaced by live telemetry)
+    t_rural = 15.0
+    lwp = 120.0
+    s_down = 800.0
+    t_atm = 5.0
+    t_base = 8.0
+    is_day = True
+    pdo = 1.2
+    amo = -0.5
+    
+    if telemetry_override:
+        t_rural = telemetry_override.get('temp_c', t_rural)
+        lwp = telemetry_override.get('lwp', lwp)
+        s_down = telemetry_override.get('solar_insolation', s_down)
+        t_atm = telemetry_override.get('t_atm', t_atm)
+        t_base = telemetry_override.get('cloud_base_temp_c', t_base)
+        pdo = telemetry_override.get('pdo_index', pdo)
+        amo = telemetry_override.get('amo_index', amo)
+
+    # 2. Execute Energy Balance Mathematics
+    energy_results = calculate_surface_energy_balance(
+        telemetry_override=telemetry_override,
+        t_rural=t_rural,
+        lwp=lwp,
+        s_downwelling=s_down,
+        t_atm=t_atm,
+        t_base=t_base,
+        is_daytime=is_day
+    )
+
+    # 3. Execute Steering Vectors
+    trajectory_results = calculate_lagrangian_trajectory(
+        pdo_index=pdo,
+        amo_index=amo
+    )
+    
+    # 4. Format Data for the Flight Computer
+    payload = {
+        "surface_energy_balance": {
+            "q_net_flux_w_m2": round(float(energy_results["q_net_flux"]), 2),
+            "delta_t_f": round(float(energy_results["delta_t_f"]), 2),
+            "predicted_surface_temp_f": round(float(energy_results["t_final_predicted"]), 2)
+        },
+        "lagrangian_steer": {
+            "u_zonal_steer": round(float(trajectory_results["U_zonal"]), 2),
+            "v_meridional_steer": round(float(trajectory_results["V_meridional"]), 2)
+        }
+    }
+    
+    # 5. Push to Global Pipeline
+    telemetry_link.update_global_state("atmospheric_models", "cloud_model", payload)
+    print("✅ Cloud dynamics calculations reported to global state.")
+    
+    return payload
+
+
+if __name__ == "__main__":
+    print("================================================================")
+    print("         CLOUD THERMODYNAMICS & STEERING MATRICES               ")
+    print("================================================================")
+    
+    # Run a local test iteration
+    results = run_cloud_layer()
+    
+    print("\n--- TEST RESULTS ---")
+    print(f"Net Q Flux:         {results['surface_energy_balance']['q_net_flux_w_m2']} W/m^2")
+    print(f"Temperature Delta:  {results['surface_energy_balance']['delta_t_f']}°F")
+    print(f"Steering U (Zonal): {results['lagrangian_steer']['u_zonal_steer']}")
+    print(f"Steering V (Merid): {results['lagrangian_steer']['v_meridional_steer']}")
