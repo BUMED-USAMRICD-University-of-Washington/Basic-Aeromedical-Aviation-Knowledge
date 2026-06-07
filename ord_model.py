@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def run_ord_layer():
+def run_ord_layer(telemetry_override=None):
     st.header("🌊 Chicago (ORD / KLOT Area) Lake Breeze Frontal Boundary")
     st.markdown(r"### Equation: $T_{\text{ORD}}(x) = T_{\text{continental}} - \left[ \Delta T_{\text{lake}} \cdot \Theta(\Delta P) \cdot \exp\left(-\frac{x}{\lambda_{\text{lake}}}\right) \right]$")
     
