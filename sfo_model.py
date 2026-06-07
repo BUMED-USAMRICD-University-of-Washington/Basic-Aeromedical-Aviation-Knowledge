@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import aviation_physics
 import streamlit as st
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
