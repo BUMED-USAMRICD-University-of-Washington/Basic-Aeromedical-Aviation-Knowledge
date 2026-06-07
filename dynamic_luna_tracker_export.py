@@ -25,6 +25,13 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
 def get_user_inputs(telemetry_override=None):
     print("--- GPS Station Lunar Log Configurator ---")
     lat = float(input("Enter Latitude in decimal degrees (e.g., 47.6062): "))
