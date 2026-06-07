@@ -1,0 +1,33 @@
+# ai_pirep.py
+import pyttsx3 # Ensure this is installed via pip
+
+def generate_pirep_data(live_data, user_inputs):
+    """
+    Assembles the standard PIREP string and the spoken radio script.
+    """
+    # 1. Standard PIREP String (Based on FAA standards)
+    pirep_string = (
+        f"UA /OV {live_data.get('latitude', 'UNK')}/{live_data.get('longitude', 'UNK')} "
+        f"/TM 1200 /FL {int(live_data.get('elevation_ft', 0)/100)} "
+        f"/TP {user_inputs['ac_type']} "
+        f"/TB {user_inputs['turbulence']} "
+        f"/IC {user_inputs['icing']} /RM {user_inputs['remarks']}"
+    )
+
+    # 2. Natural Language Version for Radio/Phone
+    spoken_version = (
+        f"Routine Pilot Report. Over coordinates {live_data.get('latitude')}, {live_data.get('longitude')}. "
+        f"Flight level {int(live_data.get('elevation_ft', 0))}. Aircraft type {user_inputs['ac_type']}. "
+        f"Turbulence: {user_inputs['turbulence'].replace('LGT', 'Light').replace('MOD', 'Moderate')}. "
+        f"Icing: {user_inputs['icing']}. Remarks: {user_inputs['remarks']}."
+    )
+    
+    return pirep_string, spoken_version
+
+def speak_pirep(text):
+    """
+    Uses the system audio engine to read the report out loud.
+    """
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
