@@ -3,6 +3,19 @@
 
 import numpy as np
 
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
 def calculate_surface_energy_balance(telemetry_override=None, t_rural, lwp, s_downwelling, t_atm, t_base, is_daytime=True):
     """
     Calculates the net surface heat flux and temperature adjustment under cloud filtration.
