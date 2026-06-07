@@ -22,19 +22,46 @@ class FlightControlDynamics:
             current_alt, 
             ground_speed
         )
+    def get_smooth_heading(self, current_pos, current_heading, ground_speed):
+        """
+        Calculates the smoothed heading. If near a waypoint, it blends
+        the heading toward the next leg.
+        """
+        active_wp = self.wp_manager.get_active_waypoint(index=0)
+        next_wp = self.wp_manager.get_active_waypoint(index=1)
+        
+        # Calculate distance to current waypoint (Simple Euclidean for now)
+        dist = np.sqrt((current_pos['lat'] - active_wp.lat)**2 + 
+                       (current_pos['lon'] - active_wp.lon)**2)
+        
+        # If we are inside the turn radius, interpolate between current and next
+        if dist < active_wp.turn_radius and next_wp:
+            # Blend factor: 0.0 at edge of radius, 1.0 at waypoint
+            blend = 1.0 - (dist / active_wp.turn_radius)
+            # Smoothly transition target heading
+            return active_wp.target_heading * (1 - blend) + next_wp.target_heading * blend
+        
+        return active_wp.target_heading
     def calculate_required_attitude(self, current_heading, target_heading, target_elevation, current_alt, ground_speed):
-        # 1. Roll Calculation (Bank angle for turn)
+        # 1. Get the smoothed target heading
+        target_h = self.get_smooth_heading(current_pos, current_heading, ground_speed)
+        
+        # 2. Proceed with attitude calc using smoothed heading
+        heading_diff = (target_h - current_heading + 180) % 360 - 180
+        roll_angle = np.clip(heading_diff * 0.5, -self.bank_limit, self.bank_limit)
+        
+        # 3. Roll Calculation (Bank angle for turn)
         heading_diff = target_heading - current_heading
         # Normalize heading difference to -180 to 180
         heading_diff = (heading_diff + 180) % 360 - 180
         roll_angle = np.clip(heading_diff * 0.5, -self.bank_limit, self.bank_limit)
         
-        # 2. Attitude (Pitch) for Elevation Change
+        # 4. Attitude (Pitch) for Elevation Change
         alt_diff = target_elevation - current_alt
         # Simplified pitch gradient (e.g., 3-degree slope is ~5.2% gradient)
         pitch_angle = np.clip(alt_diff * 0.05, -15, 15)
         
-        # 3. Rudder (Coordination)
+        # 5. Rudder (Coordination)
         rudder = roll_angle * 0.1
         
         return {"roll": roll_angle, "rudder": rudder, "pitch": pitch_angle}
