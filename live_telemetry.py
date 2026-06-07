@@ -1,3 +1,9 @@
+# memory_manager.py
+from dynamic_memory_cache import DynamicMemoryCache
+
+# Create one shared cache instance for the whole app
+shared_cache = DynamicMemoryCache(percentage=0.25)
+
 # live_telemetry.py
 # Interfaces with USB DGPS/RTK and Barometric Elevation Dongles
 
