@@ -1,4 +1,22 @@
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+--- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
 
 def calculate_takeoff_roll(telemetry_override=None, temp_c, pressure_inhg, wind_mph, wind_dir_deg, runway_heading_deg, weight_lbs=2400.0):
     """
