@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def get_user_inputs():
+def get_user_inputs(telemetry_override=None):
     """Prompts the user for decimal GPS values and year via terminal input."""
     print("--- Local Lunar Path Calculator Configuration ---")
     try:
