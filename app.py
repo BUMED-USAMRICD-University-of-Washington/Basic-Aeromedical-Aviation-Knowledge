@@ -21,7 +21,43 @@ def guidance_loop(aircraft_state, waypoint):
             aircraft_state.ground_speed
         )
         return commands
-        
+
+# Initialize
+wp_manager = WaypointManager()
+computer = FlightControlDynamics(mode="CIVILIAN")
+
+st.title("✈️ Aviation Knowledge Engine")
+
+# --- WAYPOINT REGISTRATION SIDEBAR ---
+with st.sidebar:
+    st.header("Waypoint Registration")
+    wp_name = st.text_input("Waypoint Name")
+    lat = st.number_input("Latitude", value=0.0)
+    lon = st.number_input("Longitude", value=0.0)
+    alt = st.number_input("Target Altitude", value=1500)
+    heading = st.number_input("Target Heading", value=180)
+    
+    if st.button("Register Waypoint"):
+        wp_manager.register_waypoint(wp_name, lat, lon, alt, heading)
+        st.success(f"Registered {wp_name}")
+
+# --- DYNAMICS MONITOR ---
+st.subheader("Live Trim Correction")
+active_wp = wp_manager.get_active_waypoint(index=0)
+if active_wp:
+    st.write(f"**Navigating to:** {active_wp.name}")
+    # Compute correction
+    correction = computer.calculate_required_attitude(
+        current_heading=170, # Placeholder for live telemetry
+        target_heading=active_wp.target_heading,
+        target_elevation=active_wp.alt,
+        current_alt=1450,
+        ground_speed=250
+    )
+    st.json(correction)
+else:
+    st.warning("No waypoint active.")
+    
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Basic Aviation Knowledge", layout="wide")
 
