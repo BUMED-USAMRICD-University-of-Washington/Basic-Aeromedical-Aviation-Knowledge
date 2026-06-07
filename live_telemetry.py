@@ -1,6 +1,7 @@
 # live_telemetry.py
 # Interfaces with USB DGPS/RTK and Barometric Elevation Dongles
 
+import pandas as pd
 import serial
 import pynmea2
 import time
@@ -10,7 +11,6 @@ import sys
 # --- PRIMARY ENGINE: [Model Name] ---
 import streamlit as st
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
