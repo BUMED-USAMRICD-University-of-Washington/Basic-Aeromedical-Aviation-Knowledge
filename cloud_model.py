@@ -1,8 +1,6 @@
 # cloud_model.py
 # Calculates Cloud Thermodynamic Filtration & Lagrangian Trajectories for NWS Prediction
 
-import numpy as np
-
 # --- PRIMARY ENGINE: [Model Name] ---
 import streamlit as st
 import numpy as np
