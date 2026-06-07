@@ -2,12 +2,12 @@
 # Interfaces with USB DGPS/RTK and Barometric Elevation Dongles
 
 # --- PRIMARY ENGINE: [Model Name] ---
-import serial
-import pandas as pd
-import time
-import pynmea2
-import sys
 import os
+import time
+import serial
+import sys
+import pynmea2
+import pandas as pd
 
 # --- PRIMARY ENGINE: [Model Name] ---
 import numpy as np
