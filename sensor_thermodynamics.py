@@ -1,6 +1,26 @@
 # sensor_thermodynamics.py
 # Calculates the evaporative cooling penalty and thermal lag for official temperature sensors
 
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
 def calculate_wet_sensor_penalty(telemetry_override=None, t_ambient_c, humidity, wind_speed_mps, is_wooden_sensor=False, is_raining=True):
     """
     Adjusts the predicted official maximum temperature downward due to 
