@@ -1,11 +1,11 @@
 # ai_pirep.py
-import pyttsx3 # Ensure this is installed via pip
+import pyttsx3 
 
 def generate_pirep_data(live_data, user_inputs):
     """
     Assembles the standard PIREP string and the spoken radio script.
     """
-    # 1. Standard PIREP String (Based on FAA standards)
+    # 1. Standard PIREP String (Compatible with aviationweather.gov)
     pirep_string = (
         f"UA /OV {live_data.get('latitude', 'UNK')}/{live_data.get('longitude', 'UNK')} "
         f"/TM 1200 /FL {int(live_data.get('elevation_ft', 0)/100)} "
@@ -26,8 +26,11 @@ def generate_pirep_data(live_data, user_inputs):
 
 def speak_pirep(text):
     """
-    Uses the system audio engine to read the report out loud.
+    Uses system audio to read the report out loud.
     """
-    engine = pyttsx3.init()
-    engine.say(text)
-    engine.runAndWait()
+    try:
+        engine = pyttsx3.init()
+        engine.say(text)
+        engine.runAndWait()
+    except Exception as e:
+        print(f"Audio engine error: {e}")
