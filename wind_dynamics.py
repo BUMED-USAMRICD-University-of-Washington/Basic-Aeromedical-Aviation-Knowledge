@@ -12,7 +12,6 @@ import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
 
 from numba import njit
-
 @njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 
 try:
