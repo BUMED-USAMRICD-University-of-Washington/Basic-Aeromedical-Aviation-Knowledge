@@ -94,4 +94,88 @@ This repository relies on a highly specific stack of mathematical, spatial, and 
 
 -   config.json: The central registry for Urban Heat Island modifiers and specific reporting target coordinates.
 
+This updated `README.md` is designed to be professional, documentation-ready for a GitHub repository, and clear about the dual-entry architecture (Streamlit for desktop/Android, CLI for iOS).
+
+You can copy the content below directly into your `README.md` file.
+
+Basic Aviation Knowledge Engine
+===============================
+
+The **Basic Aviation Knowledge Engine** is an extensible Python-based suite designed for atmospheric modeling, climatological reporting, and aviation performance calculation. The system is architecture-agnostic, designed to run on desktop environments, Android (via Pydroid), and iOS (via Pyto).
+
+🚀 Architecture
+---------------
+
+This repository is organized into a modular structure where **Primary Engines** (Atmospheric Models) leverage shared **Secondary Engines** (Physics & Telemetry) to ensure consistent, FAA-aligned calculations.
+
+### Dual-UI Entry Points
+
+The system is built to support two distinct operational environments:
+
+1.  **Dashboard Mode (`app.py`):** A full-featured web interface using **Streamlit**.
+
+    -   *Best for:* Desktop browsers and Android tablets.
+
+    -   *Launch:* `streamlit run app.py`
+
+2.  **iOS/Pyto Mode (`cli_main.py`):** A streamlined Command Line Interface (CLI).
+
+    -   *Best for:* iPad and iPhone portability.
+
+    -   *Launch:* Run `cli_main.py` within the Pyto app.
+
+🛠 Project Structure
+--------------------
+
+The repository strictly uses `snake_case` filenames (e.g., `sfo_model.py`) to ensure cross-platform import compatibility.
+
+-   **Primary Engines:** `aita_model.py`, `sfo_model.py`, `sea_model.py`, `rossby_model.py`, `aviation_icing.py`, etc.
+
+-   **Secondary Dependencies:** `aviation_physics.py`, `aircraft_perf.py`, `sensor_thermodynamics.py`, `aerodynamic_matrix.py`.
+
+-   **Utilities:** `ai_pirep.py` (Text-to-Speech reporting) and `live_telemetry.py` (Cross-platform sensor integration).
+
+📋 Installation
+---------------
+
+Ensure you have the required dependencies installed:
+
+Bash
+
+```
+pip install -r requirements.txt
+
+```
+
+⚖️ Professional & Academic Dedication
+-------------------------------------
+
+This project is dedicated to the instructors at Green River College, whose guidance provided the framework for this aviation modeling architecture.
+
+-   **Academic Partner:** [Green River College Aviation Technology](https://www.greenriver.edu/students/academics/areas-of-interest/program-maps/trades-industrial-tech-aviation-natural-resources/aviation-technology/index.html)
+
+-   **Professional Reference:** [Fox Rothschild Aviation Practice](https://www.foxrothschild.com/aviation)
+
+📡 PIREP Submission
+-------------------
+
+This repository includes an **AI-Assisted PIREP** module (`ai_pirep.py`). This utility generates FAA-standardized PIREP strings based on live flight data for electronic submission to the Aviation Weather Center, with a non-abbreviated text-to-speech output for radio transmission.
+
+> "A PIREP reporting good weather (often called a null report) is just as important to the forecast process as a PIREP reporting poor weather conditions."
+
+📝 License
+----------
+
+This repository is managed under the terms of the included [LICENSE](https://www.google.com/search?q=LICENSE&authuser=1) file.
+
+### A Quick Note on the README Update:
+
+-   **Naming Conventions:** I have updated the documentation to emphasize the `snake_case` (underscore) naming, which is vital for Python import stability.
+
+-   **Dual-Controller clarity:** I clearly separated the "Dashboard" vs "CLI" launch instructions, which will save you time when you switch between your PC and your iPad.
+
+-   **Professional Standards:** By including the academic and legal references in the README, you ensure that the repository carries the professional weight expected for aviation-related tooling.
+
 *Derived from metrics aligned with standard Aviation Weather operational requirements.*
+
+
