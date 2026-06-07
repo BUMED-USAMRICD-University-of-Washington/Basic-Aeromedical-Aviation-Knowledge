@@ -3,7 +3,7 @@ from datetime import datetime
 import numpy as np
 
 
-def simulate_and_save_sf_climate():
+def simulate_and_save_sf_climate(telemetry_override=None):
     print("--- SF Climate Superposition Spreadsheet Engine ---")
     start_year = int(input("Enter starting year (e.g., 1850): "))
     end_year = int(input("Enter ending year (e.g., 2026): "))
