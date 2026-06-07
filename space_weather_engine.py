@@ -14,6 +14,7 @@ import streamlit as st
 from numba import njit
 
 @njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
+import multiprocessing as mp
 
 # space_weather_engine.py
 # Tracks astronomical and solar forcing indices to offset city base grids
