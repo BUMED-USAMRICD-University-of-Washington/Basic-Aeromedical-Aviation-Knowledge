@@ -1,3 +1,4 @@
+import multiprocessing as mp
 # --- PRIMARY ENGINE: [Model Name] ---
 import numpy as np
 from numba import njit
