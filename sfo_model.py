@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def run_sfo_layer(telemetry_override=None)::
+def run_sfo_layer(telemetry_override=None, telemetry_override=None)::
     st.header("🌁 San Francisco (SFO / KMUX Area) Harmonic Superposition Model")
     st.markdown(r"### Equation: $T_{\text{SF}}(t) = T_0 + \alpha_{\text{SF}} \cdot t + \sum A_i \sin\left(\frac{2\pi}{P_i}t + \phi_i\right) + \Delta T_{\text{station}}$")
     
