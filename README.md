@@ -53,3 +53,16 @@ To integrate these models into your flight planning software or airport operatio
 
 ---
 *Developed utilizing meteorological standards aligned with the FAA Aviation Weather Handbook.*
+
+## Core Dependencies & Architecture
+
+This repository relies on a highly specific stack of mathematical, spatial, and hardware-interfacing Python libraries to process live thermodynamic variables and DGPS telemetry.
+
+* **`streamlit`**: Drives the interactive web dashboard (`app.py`), allowing real-time switching between static planning models and live in-flight telemetry modes.
+* **`pandas`**: Parses complex, fixed-width text data from the NOAA USCRN API and processes tabular coordinate exports from ExpertGPS.
+* **`numpy`**: Powers the heavy mathematical arrays required for the thermodynamic equations, including urban thermal decay constants and lake breeze frontal boundary limits.
+* **`matplotlib`**: Generates the 2D spatial cross-sections and temperature timeline visualizations rendered directly on the Streamlit dashboard.
+* **`requests`**: Handles the automated HTTP requests to fetch pristine rural baseline temperatures ($T_{rural}$) for Urban Heat Island calculations.
+* **`shapely`**: Constructs the mathematical 2D bounding boxes to verify if a specific coordinate sits inside an active radar footprint.
+* **`pyserial`**: Opens the hardware serial ports (COM/tty) to physically interface with USB DGPS and barometric elevation dongles.
+* **`pynmea2`**: Decodes the raw `$GPGGA` and `$GNGGA` satellite text strings streaming from the dongle into clean, usable latitude, longitude, and elevation variables.
