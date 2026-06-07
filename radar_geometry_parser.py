@@ -1,8 +1,19 @@
 # radar_geometry_parser.py
 # Ingests volumetric radar trackpoints to map beam heights over NWS sensors
 
-import pandas as pd
+# --- PRIMARY ENGINE: [Model Name] ---
 import io
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
 
 def load_volumetric_radar_data(telemetry_override=None, raw_text_data):
     """
