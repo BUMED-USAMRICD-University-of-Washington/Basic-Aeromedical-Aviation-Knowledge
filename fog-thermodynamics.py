@@ -2,7 +2,7 @@ import numpy as np
 
 
 def simulate_cooling_with_dynamic_fog(
-    lwp_initial, initial_temp_c=25.0, initial_dewpoint_c=12.0, hours=12.0
+    telemetry_override=None, lwp_initial, initial_temp_c=25.0, initial_dewpoint_c=12.0, hours=12.0
 ):
     """Simulates 12 hours of nighttime cooling, dynamically tracking moisture
 
