@@ -1,9 +1,7 @@
-from numba import njit
-
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
-    
 # --- PRIMARY ENGINE: [Model Name] ---
 import numpy as np
+from numba import njit
+@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 import pandas as pd
 import matplotlib.pyplot as plt
 
