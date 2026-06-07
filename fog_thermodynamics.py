@@ -11,6 +11,13 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
 def simulate_cooling_with_dynamic_fog(
     telemetry_override=None, lwp_initial, initial_temp_c=25.0, initial_dewpoint_c=12.0, hours=12.0
 ):
