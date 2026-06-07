@@ -2,6 +2,7 @@ import numpy as np
 
 
 def simulate_cooling_with_wind_shear(
+    telemetry_override=None,
     lwp_initial,
     initial_temp_c=25.0,
     initial_dewpoint_c=16.0,
