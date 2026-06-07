@@ -28,11 +28,6 @@ def run_and_save_lunar_phase(telemetry_override=None):
 from numba import njit
 
 @njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
-def calculate_density_and_cooling(temp_c, wind_mph, relative_humidity=0.50):
-    # Your existing pure-math logic here
-    T_kelvin = temp_c + 273.15
-    # ... rest of your calculations
-    return air_density, wind_chill_c, cooling_delta
 
     # Calculate across a full 29.53-day cycle using 100 evaluation steps
     t = np.linspace(start_index_day, start_index_day + 29.53, 100)
