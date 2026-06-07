@@ -1,3 +1,10 @@
+## Dedication & Professional Resources
+
+This project is dedicated to the instructors at Green River College, whose guidance provided the foundational framework for this aviation modeling architecture.
+
+* **Academic Partner:** [Green River College Aviation Technology](https://www.greenriver.edu/students/academics/areas-of-interest/program-maps/trades-industrial-tech-aviation-natural-resources/aviation-technology/index.html)
+* **Legal & Professional Reference:** [Fox Rothschild Aviation Practice](https://www.foxrothschild.com/aviation)
+
 ✈️ Basic Aviation Knowledge - Airport Reporting Models
 ======================================================
 
