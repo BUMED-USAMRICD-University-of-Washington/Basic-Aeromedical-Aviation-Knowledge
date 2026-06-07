@@ -17,11 +17,6 @@ import streamlit as st
 from numba import njit
 
 @njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
-def calculate_density_and_cooling(temp_c, wind_mph, relative_humidity=0.50):
-    # Your existing pure-math logic here
-    T_kelvin = temp_c + 273.15
-    # ... rest of your calculations
-    return air_density, wind_chill_c, cooling_delta
 
 def generate_pirep_data(live_data, user_inputs):
     """
