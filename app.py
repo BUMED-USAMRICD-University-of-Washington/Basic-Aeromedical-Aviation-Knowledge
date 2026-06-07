@@ -62,13 +62,15 @@ model_choice = st.sidebar.radio(
 
 # --- MODEL ROUTING ---
 # Pass telemetry_override to all modules to enable dynamic flight data
+
 if model_choice == "San Francisco (SFO / KMUX)":
     import sfo_model
     sfo_model.run_sfo_layer(telemetry_override=live_data)
 
 elif model_choice == "Atlanta Spikes (ATL / KFFC)":
-    import aita_model
-    aita_model.run_atl_layer(telemetry_override=live_data)
+    # Routing to your spike-logic module
+    import AITA_spikes
+    AITA_spikes.run_atl_layer(telemetry_override=live_data)
 
 elif model_choice == "Seattle Convergence (SEA / KATX)":
     import sea_model
