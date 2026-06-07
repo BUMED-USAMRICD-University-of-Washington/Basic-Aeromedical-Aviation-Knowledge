@@ -2,7 +2,6 @@
 # Calculates Cloud Thermodynamic Filtration & Lagrangian Trajectories for NWS Prediction
 
 # --- PRIMARY ENGINE: [Model Name] ---
-import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,6 +12,7 @@ import aviation_telemetry      # Data flow
 import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
+import streamlit as st
 
 def calculate_surface_energy_balance(telemetry_override=None, t_rural, lwp, s_downwelling, t_atm, t_base, is_daytime=True):
     """
