@@ -1,13 +1,11 @@
 import numpy as np
 from waypoint_manager import WaypointManager
-
 class FlightControlDynamics:
     def __init__(self, mode="CIVILIAN"):
         self.mode = mode
         self.dynamic = True
         self.bank_limit = 30.0 if mode == "CIVILIAN" else 60.0
         self.wp_manager = WaypointManager() # Now the engine manages its own navigation data
-
     def get_dynamics_for_active_waypoint(self, current_heading, current_alt, ground_speed):
         """
         Fetches the current active waypoint and calculates the required attitude.
@@ -24,7 +22,6 @@ class FlightControlDynamics:
             current_alt, 
             ground_speed
         )
-
     def calculate_required_attitude(self, current_heading, target_heading, target_elevation, current_alt, ground_speed):
         # 1. Roll Calculation (Bank angle for turn)
         heading_diff = target_heading - current_heading
@@ -45,9 +42,7 @@ class FlightControlDynamics:
     def set_mode(self, dynamic_on=True, mode="CIVILIAN"):
         self.dynamic = dynamic_on
         self.bank_limit = 30.0 if mode == "CIVILIAN" else 60.0
-        
 # Add this method to your FlightControlDynamics class in flight_control_dynamics.py
-
     def calculate_turn_deceleration(self, weight_lbs, thrust_lbs, velocity_kts, bank_angle_deg):
         """
         Calculates the deceleration (speed bleed) in a banked turn.
