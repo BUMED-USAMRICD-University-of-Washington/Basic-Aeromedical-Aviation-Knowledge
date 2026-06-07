@@ -12,7 +12,6 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
-import multiprocessing as mp
 
 def calculate_tidal_temperature_suppression(telemetry_override=None):
     print("\n--- Tidal Boundary Displaced Heat Flux Calculator ---")
