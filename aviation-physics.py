@@ -1,7 +1,7 @@
 import streamlit as st
 import math
 
-def calculate_ground_effect_ratio(height, wingspan):
+def calculate_ground_effect_ratio(telemetry_override=None, height, wingspan):
     if wingspan <= 0: return 1.0
     h_b_ratio = height / wingspan
     ratio = (33 * (h_b_ratio ** 2)) / (1 + 33 * (h_b_ratio ** 2))
