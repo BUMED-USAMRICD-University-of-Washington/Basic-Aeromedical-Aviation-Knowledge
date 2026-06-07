@@ -1,5 +1,18 @@
 import numpy as np
 
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
 def calculate_icing_accretion(telemetry_override=None, temp_c, rh_pct, rainfall_mm_hr, elevation_m, wind_mph=30.0):
     """Solves the coupled mass collection and thermodynamic freezing equations."""
     # 1. Core Physical Constants
