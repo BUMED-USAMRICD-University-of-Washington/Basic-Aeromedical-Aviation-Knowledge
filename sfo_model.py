@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import aviation_physics
 
 def run_sfo_layer(telemetry_override=None, telemetry_override=None)::
     st.header("🌁 San Francisco (SFO / KMUX Area) Harmonic Superposition Model")
