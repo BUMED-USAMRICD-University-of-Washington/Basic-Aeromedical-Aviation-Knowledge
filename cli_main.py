@@ -1,6 +1,9 @@
 # cli_main.py
 import sys
 import importlib
+from waypoint_manager import WaypointManager
+# Initialize the manager globally
+wp_manager = WaypointManager()
 
 # List of all primary engine modules to verify and load
 
