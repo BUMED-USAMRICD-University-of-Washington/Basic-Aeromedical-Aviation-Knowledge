@@ -128,3 +128,28 @@ def get_turn_exit_metrics(self, current_v_kts, bank_deg, roc_fpm, thrust_lbs, we
         "stall_margin_kts": round(stall_margin, 1),
         "is_safe": stall_margin > 10.0 # Warning flag if margin < 10 knots
     }
+    # Add this to your FlightControlDynamics class
+    def analyze_maneuver_safety(self, current_airspeed, target_bank_deg, v_stall_level=50.0):
+        """
+        Predicts if a planned maneuver will breach safety margins.
+        Returns: { 'is_unsafe': bool, 'margin': float }
+        """
+        # Calculate Load Factor for the target bank
+        rad_bank = np.radians(target_bank_deg)
+        n = 1.0 / np.cos(rad_bank) # Load factor formula
+        
+        # Calculate Dynamic Stall Speed
+        v_stall_turn = v_stall_level * np.sqrt(n) # Stall Speed Penalty multiplier
+        
+        # Calculate Margin (Safety Buffer)
+        margin = current_airspeed - v_stall_turn
+        
+        # Advisory Threshold: 15 knots is a common safety buffer for GA/Commercial envelopes
+        # If margin is < 15, we flag it as an "Unsafe Maneuver Plan"
+        is_unsafe = margin < 15.0 
+        
+        return {
+            "is_unsafe": is_unsafe,
+            "margin": round(margin, 1),
+            "stall_speed_turn": round(v_stall_turn, 1)
+        }
