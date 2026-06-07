@@ -9,6 +9,14 @@ import aviation_telemetry      # Data flow
 import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+    
 def run_radiation_layer(telemetry_override=None):
     st.header("☀️ Radiative Energy Balance & Sensor Heat Flux Model")
     st.markdown(r"### Mathematical Core Energy Balance Engine:")
