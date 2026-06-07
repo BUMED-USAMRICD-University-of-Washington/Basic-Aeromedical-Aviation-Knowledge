@@ -1,6 +1,6 @@
 import numpy as np
 
-def calculate_takeoff_roll(temp_c, pressure_inhg, wind_mph, wind_dir_deg, runway_heading_deg, weight_lbs=2400.0):
+def calculate_takeoff_roll(telemetry_override=None, temp_c, pressure_inhg, wind_mph, wind_dir_deg, runway_heading_deg, weight_lbs=2400.0):
     """
     Solves the combined moist air density, runway wind vector, and aerodynamic 
     lift equations to predict exact aircraft ground roll distance.
