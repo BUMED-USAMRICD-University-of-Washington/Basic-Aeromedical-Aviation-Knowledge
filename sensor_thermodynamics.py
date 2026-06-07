@@ -33,3 +33,34 @@ def calculate_wet_sensor_penalty(t_ambient_c, humidity, wind_speed_mps, is_woode
 # If a wooden rural sensor gets rained on, and then the wind blows at 5 m/s with 60% humidity:
 # penalty = calculate_wet_sensor_penalty(30.0, 60.0, 5.0, is_wooden_sensor=True)
 # The final official record will read ~2.5°F COOLER than the actual ambient air.
+
+def calculate_magnetic_field_cooling(b_field_tesla=5.3e-5, air_density=1.2, humidity=50.0):
+    """
+    Calculates the theoretical diamagnetic cooling effect of a local magnetic field 
+    on the moist air mass surrounding the thermometer target.
+    """
+    import math
+    
+    # Fundamental physics constants
+    mu_0 = 4 * math.pi * 1e-7  # Vacuum permeability
+    c_p = 1005.0               # Specific heat of air J/(kg*K)
+    
+    # Calculate weighted magnetic susceptibility based on water vapor presence
+    # Dry air is slightly diamagnetic, but water dominates the negative susceptibility
+    chi_m_dry = -0.4e-8
+    chi_m_water = -9.0e-6
+    
+    # Scale susceptibility by humidity percentage
+    chi_m_weighted = chi_m_dry + (chi_m_water * (humidity / 100.0))
+    
+    # The Diamagnetic Thermodynamic Equation
+    delta_t_mag_kelvin = (chi_m_weighted * (b_field_tesla ** 2)) / (2 * mu_0 * air_density * c_p)
+    
+    # Convert Kelvin delta to Fahrenheit
+    delta_t_mag_f = delta_t_mag_kelvin * (9.0 / 5.0)
+    
+    return delta_t_mag_f
+
+# Example Execution:
+# b_field_penalty = calculate_magnetic_field_cooling(b_field_tesla=0.000053, air_density=1.18, humidity=80.0)
+# final_thermometer_target = base_temperature - evaporative_penalty + b_field_penalty
