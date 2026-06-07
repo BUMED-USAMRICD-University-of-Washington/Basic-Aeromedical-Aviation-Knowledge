@@ -1,4 +1,4 @@
-def calculate_tidal_temperature_suppression():
+def calculate_tidal_temperature_suppression(telemetry_override=None):
     print("\n--- Tidal Boundary Displaced Heat Flux Calculator ---")
     T_synoptic = float(input("Enter broad inland forecasted regional temperature (°F): "))
     T_water = float(input("Enter active offshore ocean surface temperature (°F): "))
