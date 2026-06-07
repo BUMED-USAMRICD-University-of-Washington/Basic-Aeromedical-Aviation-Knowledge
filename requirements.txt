@@ -7,3 +7,4 @@ shapely
 pyserial
 pynmea2
 pyttsx3
+cupy-cuda12x
