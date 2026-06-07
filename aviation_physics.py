@@ -1,3 +1,9 @@
+# memory_manager.py
+from dynamic_memory_cache import DynamicMemoryCache
+
+# Create one shared cache instance for the whole app
+shared_cache = DynamicMemoryCache(percentage=0.25)
+
 import multiprocessing as mp
 # --- PRIMARY ENGINE: [Model Name] ---
 import numpy as np
