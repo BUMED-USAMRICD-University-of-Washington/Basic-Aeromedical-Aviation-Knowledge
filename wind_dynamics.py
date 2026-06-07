@@ -1,22 +1,24 @@
-# memory_manager.py
-from dynamic_memory_cache import DynamicMemoryCache
-# Create one shared cache instance for the whole app
-shared_cache = DynamicMemoryCache(percentage=0.075)
-# --- PRIMARY ENGINE: [Model Name] ---
-import numpy as np
+# --- SHARED MEMORY CACHE ---
+try:
+    from dynamic_memory_cache import DynamicMemoryCache
+    # Create one shared cache instance for the whole app
+    shared_cache = DynamicMemoryCache(percentage=0.075)
+except ImportError:
+    pass # Fallback if dynamic_memory_cache is not present in local testing
+
+# --- PRIMARY ENGINE: Wind Dynamics ---
 import pandas as pd
 import matplotlib.pyplot as plt
+from numba import njit
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
+import telemetry_link          # NEW: Integrated Centralized Data Bus
 import aviation_physics        # Core math
 import aviation_telemetry      # Data flow
 import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
-
-from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 
 try:
     import cupy as np  # Attempt to use GPU-accelerated array math
@@ -25,7 +27,9 @@ except ImportError:
     import numpy as np # Fallback to standard CPU math
     print("⚡ Using CPU (NVIDIA acceleration not detected)")
 
-def calculate_density_and_cooling(telemetry_override=None, temp_c, wind_mph, relative_humidity=0.50):
+
+@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
+def calculate_density_and_cooling(temp_c, wind_mph, relative_humidity=0.50):
     """
     Solves the combined gas density and convective wind cooling equations
     for atmospheric weather analysis.
@@ -60,6 +64,52 @@ def calculate_density_and_cooling(telemetry_override=None, temp_c, wind_mph, rel
         cooling_delta = 0.0
         
     return air_density, wind_chill_c, cooling_delta
+
+
+def run_wind_layer(telemetry_override=None):
+    """
+    Main orchestration function. Extracts live telemetry, runs the high-performance
+    physics simulation, and reports the findings directly to the Boeing JSON payload.
+    """
+    print("💨 Running Wind Dynamics Matrix...")
+    
+    # 1. Default Baseline Parameters
+    temp = 4.0
+    wind = 15.0
+    rh = 0.50
+    
+    # 2. Parse incoming live telemetry (with safe fallbacks)
+    if telemetry_override:
+        temp = telemetry_override.get('temp_c', temp)
+        wind = telemetry_override.get('wind_mph', wind)
+        
+        # Normalize relative humidity
+        raw_rh = telemetry_override.get('rh_pct', rh * 100.0)
+        rh = raw_rh / 100.0 if raw_rh > 1.0 else raw_rh
+
+    # 3. Execute GPU/FastMath Physics Engine (Note: telemetry_override removed from njit args for strict typing)
+    density, chill, delta = calculate_density_and_cooling(
+        temp_c=temp, 
+        wind_mph=wind, 
+        relative_humidity=rh
+    )
+    
+    # 4. Format Data for the Flight Computer
+    payload = {
+        "base_temp_c": temp,
+        "wind_speed_mph": wind,
+        "relative_humidity": rh,
+        "air_density_kg_m3": round(float(density), 4),
+        "wind_chill_c": round(float(chill), 2),
+        "convective_cooling_delta_c": round(float(delta), 2)
+    }
+    
+    # 5. Push to Global Pipeline
+    telemetry_link.update_global_state("dynamics", "wind_matrix", payload)
+    print("✅ Wind dynamics calculations reported to global state.")
+    
+    return payload
+
 
 if __name__ == "__main__":
     print("================================================================")
