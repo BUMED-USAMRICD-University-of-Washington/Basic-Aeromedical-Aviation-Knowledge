@@ -1,11 +1,29 @@
 # uscrn_scraper.py
 # Ingests live, pristine rural baseline temperatures from NOAA USCRN networks
 
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
+import numpy as np
 import pandas as pd
 import requests
 from io import StringIO
 from datetime import datetime
+import matplotlib.pyplot as plt
 
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+    
 # ... [USCRN_STATION_MAP dictionary stays here] ...
 
 @st.cache_data(ttl=3600)  # Cache the result for 1 hour to prevent API throttling
