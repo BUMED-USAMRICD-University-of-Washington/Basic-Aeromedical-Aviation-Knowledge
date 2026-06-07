@@ -3,7 +3,7 @@
 
 import numpy as np
 
-def calculate_surface_energy_balance(t_rural, lwp, s_downwelling, t_atm, t_base, is_daytime=True):
+def calculate_surface_energy_balance(telemetry_override=None, t_rural, lwp, s_downwelling, t_atm, t_base, is_daytime=True):
     """
     Calculates the net surface heat flux and temperature adjustment under cloud filtration.
     Equations:
