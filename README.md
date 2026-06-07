@@ -150,8 +150,8 @@ pip install -r requirements.txt
 
 ⚖️ Professional & Academic Dedication
 -------------------------------------
-[Basic Aviation Knowledge Certificate](https://www.parchment.com/u/award/3f309d576264c3d5183346a1eb518282/file)!
-[Basic Aviation Knowledge](https://seattledatarecovery.com/images/Basic-Aviation-Knowledge.png)
+[Basic Aviation Knowledge Certificate](https://www.parchment.com/u/award/3f309d576264c3d5183346a1eb518282/file)
+![Basic Aviation Knowledge](https://seattledatarecovery.com/images/Basic-Aviation-Knowledge.png)
 This project is dedicated to the instructors at Green River College, whose guidance provided the framework for this aviation modeling architecture.
 
 -   **Academic Partner:** [Green River College Aviation Technology](https://www.greenriver.edu/students/academics/areas-of-interest/program-maps/trades-industrial-tech-aviation-natural-resources/aviation-technology/index.html)
