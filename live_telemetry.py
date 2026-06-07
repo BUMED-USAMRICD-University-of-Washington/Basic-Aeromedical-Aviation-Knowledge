@@ -47,6 +47,18 @@ if not IS_IOS:
     import serial
     import pynmea2
 
+# Add to live_telemetry.py or a new physics_vector.py
+def calculate_force_vectors(acceleration_xyz, mass_kg):
+    """
+    Inputs: 
+        acceleration_xyz: Tuple (ax, ay, az) from IMU/Dongle
+        mass_kg: Current aircraft mass
+    Returns: Force vector in Newtons (N)
+    """
+    accel_vec = np.array(acceleration_xyz)
+    force_vec = accel_vec * mass_kg
+    return force_vec
+    
 def get_live_position(telemetry_override=None, com_port="/dev/ttyUSB0", baudrate=9600):
     """
     Automatically detects the platform and fetches telemetry.
