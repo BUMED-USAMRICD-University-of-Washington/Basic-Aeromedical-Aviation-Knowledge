@@ -1,3 +1,16 @@
+# --- PRIMARY ENGINE: [Model Name] ---
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+import streamlit as st
+
 def calculate_tidal_temperature_suppression(telemetry_override=None):
     print("\n--- Tidal Boundary Displaced Heat Flux Calculator ---")
     T_synoptic = float(input("Enter broad inland forecasted regional temperature (°F): "))
