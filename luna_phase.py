@@ -1,3 +1,23 @@
+# --- PRIMARY ENGINE: [Model Name] ---
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+    
 def run_lunar_phase_modulation():
     print("\n--- Lunar Synodic Phase Anomaly Map ---")
     target_month_start = float(input("Enter start index day of lunar calendar (0 = New Moon): "))
