@@ -1,10 +1,19 @@
+# --- PRIMARY ENGINE: [Model Name] ---
+import pandas as pd
+import streamlit as st
+import numpy as np
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import astropy.coordinates as coord
 import astropy.units as u
 from astropy.time import Time
-import matplotlib.pyplot as plt
-import numpy as np
 
+# --- SECONDARY ENGINE DEPENDENCIES ---
+import aviation_physics        # Core math
+import aviation_telemetry      # Data flow
+import aircraft_perf           # Performance calculations
+import sensor_thermodynamics   # Env data scaling
+import aerodynamic_matrix      # Lift/Drag logic
 
 def get_user_inputs(telemetry_override=None):
     """Prompts the user for decimal GPS values and year via terminal input."""
