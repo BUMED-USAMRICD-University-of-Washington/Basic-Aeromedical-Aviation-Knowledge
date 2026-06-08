@@ -1,4 +1,6 @@
 # --- PRIMARY ENGINE: Space Weather ---
+import os
+import struct
 import pandas as pd
 import matplotlib.pyplot as plt
 from numba import njit
@@ -23,6 +25,7 @@ except ImportError:
 
 # space_weather_engine.py
 # Tracks astronomical and solar forcing indices to offset city base grids
+# AND evaluates Deep Sky Object (DSO) masses and gravitational fields.
 
 @njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 def calculate_astronomical_offsets(solar_flux_f107, galactic_ray_count):
@@ -39,6 +42,88 @@ def calculate_astronomical_offsets(solar_flux_f107, galactic_ray_count):
     
     return delta_tsi_forcing, cosmic_variance
 
+@njit(fastmath=True)
+def compute_stellar_mass_and_gravity_vectorized(mags_array):
+    """
+    High-performance vectorized calculation of Stellar Masses using the
+    empirical Mass-Luminosity relation (L proportional to M^3.5),
+    and a Net Gravitational Field sum calculation.
+    """
+    G = 6.67430e-11 # Universal Gravitational Constant
+    mass_solar_kg = 1.989e30
+    
+    masses_solar = np.zeros_like(mags_array)
+    net_g_field = 0.0
+    
+    for i in range(len(mags_array)):
+        # L/L_sun = 10 ^ (0.4 * (M_sun - M_star)) | Absolute mag of Sun ~ 4.83
+        lum_ratio = 10 ** (0.4 * (4.83 - mags_array[i]))
+        
+        # M = L^(1/3.5)
+        mass_s = lum_ratio ** (1/3.5)
+        masses_solar[i] = mass_s
+        
+        # Gravitational field contribution equation: g_net = G * M / R^2
+        # Assuming a normalized R distance approximation (e.g. 100 lightyears in meters) for baseline engine testing
+        m_kg = mass_s * mass_solar_kg
+        r_normalized_m = 9.461e15 * 100.0 
+        
+        # Summing the scalar field
+        net_g_field += (G * m_kg) / (r_normalized_m ** 2)
+        
+    return masses_solar, net_g_field
+
+def parse_stellarium_catalog(file_path):
+    """
+    Parses the Stellarium catalog-3.23.dat file.
+    Returns a Pandas DataFrame containing the extracted celestial objects.
+    """
+    if not os.path.exists(file_path):
+        return None
+
+    # Method 1: Attempt to read as Tab-Separated Text (TSV) or CSV
+    try:
+        with open(file_path, 'rb') as f:
+            header_check = f.read(4)
+            
+        if b'\x00' not in header_check:
+            df = pd.read_csv(
+                file_path, 
+                sep='\t',
+                comment='#',
+                low_memory=False,
+                names=["ID", "RA", "Dec", "Type", "Morph_Type", "Mag", "Size_Arcmin", "Orientation", "Name"]
+            )
+            df = df.dropna(subset=['RA', 'Dec', 'Mag'])
+            return df
+            
+    except Exception:
+        pass
+
+    # Method 2: Binary Struct Parsing (Fallback for compiled catalogs)
+    objects = []
+    with open(file_path, 'rb') as f:
+        header_data = f.read(32) 
+        record_size = 24 
+        while True:
+            record = f.read(record_size)
+            if not record or len(record) < record_size:
+                break
+            try:
+                unpacked_data = struct.unpack('<iffffi', record)
+                objects.append({
+                    "ID": unpacked_data[0],
+                    "RA": unpacked_data[1],
+                    "Dec": unpacked_data[2],
+                    "Mag": unpacked_data[3],
+                    "Size_Arcmin": unpacked_data[4],
+                    "Type": unpacked_data[5]
+                })
+            except struct.error:
+                break
+
+    df = pd.DataFrame(objects)
+    return df.dropna(subset=['Mag'])
 
 def run_space_layer(telemetry_override=None):
     """
@@ -54,43 +139,4 @@ def run_space_layer(telemetry_override=None):
     # 2. Parse incoming live telemetry
     if telemetry_override:
         f107_flux = telemetry_override.get('solar_flux_f107', f107_flux)
-        gcr_count = telemetry_override.get('galactic_ray_count', gcr_count)
-
-    # 3. Execute GPU/FastMath Physics Engine
-    tsi_forcing, cosmic_var = calculate_astronomical_offsets(
-        solar_flux_f107=float(f107_flux), 
-        galactic_ray_count=float(gcr_count)
-    )
-    
-    total_offset = tsi_forcing + cosmic_var
-    
-    # 4. Format Data for the Flight Computer
-    payload = {
-        "solar_flux_f107_sfu": round(float(f107_flux), 2),
-        "galactic_ray_count_cpm": round(float(gcr_count), 2),
-        "delta_tsi_forcing_w_m2": round(float(tsi_forcing), 6),
-        "cosmic_ionization_variance": float(cosmic_var),
-        "total_astronomical_offset": float(total_offset)
-    }
-    
-    # 5. Push to Global Pipeline
-    telemetry_link.update_global_state("atmospheric_models", "space_weather", payload)
-    print("✅ Space Weather calculations reported to global state.")
-    
-    return payload
-
-
-if __name__ == "__main__":
-    print("================================================================")
-    print("         SOLAR & COSMIC ASTRONOMICAL OFFSET TRACKER             ")
-    print("================================================================")
-    
-    # Run a local test iteration
-    results = run_space_layer()
-    
-    print("\n--- TEST RESULTS ---")
-    print(f"Solar Flux (F10.7):   {results['solar_flux_f107_sfu']} sfu")
-    print(f"Galactic Ray Count:   {results['galactic_ray_count_cpm']} cpm")
-    print(f"TSI Forcing Delta:    {results['delta_tsi_forcing_w_m2']} W/m^2")
-    print(f"Cosmic Variance:      {results['cosmic_ionization_variance']}")
-    print(f"Total Model Offset:   {results['total_astronomical_offset']}")
+        gcr_count = telemetry_override.get('galactic_ray_count', gcr_
