@@ -3,6 +3,8 @@ import multiprocessing as mp
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import telemetry_link
+import datetime
 from datetime import datetime, timedelta
 import astropy.coordinates as coord
 import astropy.units as u
@@ -16,6 +18,12 @@ import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
 
+def calculate_future_position():
+    # This respects your manual override if you set one!
+    now = telemetry_link.time_manager.get_now() 
+    future = now + datetime.timedelta(hours=48)
+    return future
+    
 def get_user_inputs(telemetry_override=None):
     """Prompts the user for decimal GPS values and year via terminal input."""
     print("--- Local Lunar Path Calculator Configuration ---")
