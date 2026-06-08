@@ -6,14 +6,14 @@ This project is dedicated to the instructors at Green River College, whose guida
 * **Academic Partner:** [Green River College Aviation Technology](https://www.greenriver.edu/students/academics/areas-of-interest/program-maps/trades-industrial-tech-aviation-natural-resources/aviation-technology/index.html)
 * **Legal & Professional Reference:** [Fox Rothschild Aviation Practice](https://www.foxrothschild.com/aviation)
 
-✈️ Basic Aviation Knowledge - Airport Reporting Models
+Basic Aviation Knowledge - Airport Reporting Models
 ======================================================
 
 This repository houses a suite of proprietary, physics-driven predictive models and a live Streamlit dashboard. It is designed to simulate exact Official Climatological Record temperatures (T_station), localized microclimate offsets, and high-precision Density Altitude thresholds for aviation performance.
 
 By coupling macro-atmospheric fluid dynamics with the specific heat capacity of physical ground-station enclosures, this architecture calculates highly precise environmental baselines that strip away structural and hardware-induced temperature errors.
 
-🌟 Core Features
+Core Features
 ----------------
 
 -   Official Climatological Record Prediction: Mathematically predicts physical thermodynamics, including evaporative cooling penalties, thermal mass lag, and solar albedo variants.
@@ -34,7 +34,7 @@ By coupling macro-atmospheric fluid dynamics with the specific heat capacity of 
 
 -   Pristine Baseline Routing: Automatically ingests live, pristine rural baseline temperatures via fixed-width text feeds to calculate accurate Urban Heat Island gradients and isolate structural heat multipliers.
 
-🛠️ Installation & Setup
+Installation & Setup
 ------------------------
 
 1.  Clone the Repository:
@@ -59,7 +59,7 @@ By coupling macro-atmospheric fluid dynamics with the specific heat capacity of 
 
     To utilize live tracking, plug your compatible USB DGPS dongle into your device, launch the app, and switch the sidebar toggle to "Live Flight Mode." (Note: Verify and update the target COM/tty port in live_telemetry.py based on your operating system).
 
-📚 Core Dependencies & Architecture
+Core Dependencies & Architecture
 -----------------------------------
 
 This repository relies on a highly specific stack of mathematical, spatial, and hardware-interfacing Python libraries to process live thermodynamic variables and DGPS telemetry.
@@ -80,7 +80,7 @@ This repository relies on a highly specific stack of mathematical, spatial, and 
 
 -   pynmea2: Decodes the raw $GPGGA and $GNGGA satellite text strings streaming from the dongle into clean, usable latitude, longitude, and elevation variables.
 
-📂 Key Module Directory
+Key Module Directory
 -----------------------
 
 -   app.py: The main Streamlit execution application and UI router.
@@ -104,7 +104,7 @@ Basic Aviation Knowledge Engine
 
 The **Basic Aviation Knowledge Engine** is an extensible Python-based suite designed for atmospheric modeling, climatological reporting, and aviation performance calculation. The system is architecture-agnostic, designed to run on desktop environments, Android (via Pydroid), and iOS (via Pyto).
 
-🚀 Architecture
+Architecture
 ---------------
 
 This repository is organized into a modular structure where **Primary Engines** (Atmospheric Models) leverage shared **Secondary Engines** (Physics & Telemetry) to ensure consistent, FAA-aligned calculations.
@@ -125,7 +125,7 @@ The system is built to support two distinct operational environments:
 
     -   *Launch:* Run `cli_main.py` within the Pyto app.
 
-🛠 Project Structure
+Project Structure
 --------------------
 
 The repository strictly uses `snake_case` filenames (e.g., `sfo_model.py`) to ensure cross-platform import compatibility.
@@ -136,7 +136,7 @@ The repository strictly uses `snake_case` filenames (e.g., `sfo_model.py`) to en
 
 -   **Utilities:** `ai_pirep.py` (Text-to-Speech reporting) and `live_telemetry.py` (Cross-platform sensor integration).
 
-📋 Installation
+Installation
 ---------------
 
 Ensure you have the required dependencies installed:
@@ -148,7 +148,7 @@ pip install -r requirements.txt
 
 ```
 
-⚖️ Professional & Academic Dedication
+Professional & Academic Dedication
 -------------------------------------
 [Basic Aviation Knowledge Certificate](https://www.parchment.com/u/award/3f309d576264c3d5183346a1eb518282/file)
 ![Basic Aviation Knowledge](https://seattledatarecovery.com/images/Basic-Aviation-Knowledge.png)
@@ -158,14 +158,14 @@ This project is dedicated to the instructors at Green River College, whose guida
 
 -   **Professional Reference:** [Fox Rothschild Aviation Practice](https://www.foxrothschild.com/aviation)
 
-📡 PIREP Submission
+PIREP Submission
 -------------------
 
 This repository includes an **AI-Assisted PIREP** module (`ai_pirep.py`). This utility generates FAA-standardized PIREP strings based on live flight data for electronic submission to the Aviation Weather Center, with a non-abbreviated text-to-speech output for radio transmission.
 
 > "A PIREP reporting good weather (often called a null report) is just as important to the forecast process as a PIREP reporting poor weather conditions."
 
-📝 License
+License
 ----------
 
 This repository is managed under the terms of the included [LICENSE](https://www.google.com/search?q=LICENSE&authuser=1) file.
