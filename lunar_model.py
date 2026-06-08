@@ -2,8 +2,8 @@
 import multiprocessing as mp
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-now = datetime.utcnow()
+import telemetry_link
+import datetime
 import astropy.coordinates as coord
 import astropy.units as u
 from astropy.time import Time
@@ -24,6 +24,11 @@ except ImportError:
     import numpy as np # Fallback to standard CPU math
     print("⚡ Using CPU (NVIDIA acceleration not detected)")
 
+def calculate_future_position():
+    # This respects your manual override if you set one!
+    now = telemetry_link.time_manager.get_now() 
+    future = now + datetime.timedelta(hours=48)
+    return future
 
 def calculate_lunar_ephemeris(lat, lon, elev, target_year):
     """Core mathematical solver for lunar topocentric coordinates."""
