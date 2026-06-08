@@ -34,6 +34,18 @@ Core Features
 
 -   Pristine Baseline Routing: Automatically ingests live, pristine rural baseline temperatures via fixed-width text feeds to calculate accurate Urban Heat Island gradients and isolate structural heat multipliers.
 
+-   Advanced Entry Engine: Atmospheric entry management utilizing Sutton-Graves stagnation heat flux models and PID-controlled bank-angle correction for storm drift.
+
+-   Energy Management: Automated S-Turn maneuver injection to dissipate kinetic energy during high-angle or "too hot" arrivals.
+
+-   Performance Kernels: Hot-path physics calculations (Rossby dynamics, icing models, thermodynamics) are accelerated via **Numba (`njit`)** and integrated multicore processing for near-real-time throughput.
+
+-   Config Validation: Enforces strict Pydantic schema validation for all inputs (mass, area, G-loads). Rejects malformed configuration files before simulation start.
+
+-   Atomic Telemetry: Utilizes file-locking (`fcntl`) for all binary telemetry exports (Lockheed 1553B, NASA HDF5), ensuring data integrity during high-throughput flight loops.
+
+-   Protocol Integrity: Automated pre-flight checklists via `cli_main.py` verify that all six aerospace export protocols (Boeing, NASA, Lockheed, Axiom, Northrop, OAAM) are live and writing valid data.
+
 Installation & Setup
 ------------------------
 
@@ -49,13 +61,51 @@ Installation & Setup
 
     pip install -r requirements.txt
 
-3.  Launch the Dashboard:
+### Validation & Readiness
 
-    Start the local Streamlit server to open the interface in your browser:
+Verify all protocol channels and configurations:
 
-    streamlit run app.py
+Bash
 
-4.  Live Telemetry (In-Flight Operations):
+```
+python cli_main.py validate
+
+```
+
+### Launch Mission Control
+
+Start the cockpit TUI with tactical profile:
+
+Bash
+
+```
+python app.py --mode TACTICAL --target Earth
+
+```
+
+### Performance Reporting
+
+Export high-fidelity trajectory data for FAA/Mission Review:
+
+Bash
+
+```
+python aviation_matrix_export.py
+
+```
+
+### Auto-Documentation
+
+Generate/Refresh documentation from current code docstrings:
+
+Bash
+
+```
+python cli_main.py regen-docs
+
+```
+
+Live Telemetry (In-Flight Operations):
 
     To utilize live tracking, plug your compatible USB DGPS dongle into your device, launch the app, and switch the sidebar toggle to "Live Flight Mode." (Note: Verify and update the target COM/tty port in live_telemetry.py based on your operating system).
 
@@ -79,6 +129,30 @@ This repository relies on a highly specific stack of mathematical, spatial, and 
 -   pyserial: Opens the hardware serial ports (COM/tty) to physically interface with USB DGPS and barometric elevation dongles.
 
 -   pynmea2: Decodes the raw $GPGGA and $GNGGA satellite text strings streaming from the dongle into clean, usable latitude, longitude, and elevation variables.
+
+-   textual
+
+-   "typer[all]"
+
+-   pydantic
+
+-   pyserial
+
+-   pyttsx3
+
+-   cupy-cuda12x
+
+-   matplotlib
+
+-   astropy
+
+-   requests
+
+-   psutil
+
+-   h5py          # For multi-dimensional HDF5 scientific data
+
+-   struct        # For binary CCSDS-style packet packing (built-in)
 
 Key Module Directory
 -----------------------
