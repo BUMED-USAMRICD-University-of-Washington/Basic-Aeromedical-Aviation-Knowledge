@@ -82,12 +82,12 @@ def run_rossby_layer(telemetry_override=None):
         )
         
         payload = {
-            "station_latitude_deg": float(station_lat),
-            "planetary_beta_gradient": float(beta),
-            "zonal_wavelength_km": float(wave_x / 1000.0),
-            "adjusted_jet_core_m_s": float(u_adj),
-            "wave_phase_speed_m_s": float(phase_c),
-            "migration_rate_km_day": float(prog_rate),
+            "station_latitude_deg": float(station_lat), 15),
+            "planetary_beta_gradient": float(beta), 15),
+            "zonal_wavelength_km": float(wave_x / 1000.0), 15),
+            "adjusted_jet_core_m_s": float(u_adj), 15),
+            "wave_phase_speed_m_s": float(phase_c), 15),
+            "migration_rate_km_day": float(prog_rate), 15),
             "is_blocking_pattern": bool(abs(phase_c) < 1.5)
         }
         
