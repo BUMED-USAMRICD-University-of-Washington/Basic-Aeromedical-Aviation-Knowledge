@@ -238,15 +238,7 @@ This project is dedicated to the instructors at Green River College, whose guida
 License
 ----------
 
-This repository is managed under the terms of the included [LICENSE](https://www.google.com/search?q=LICENSE&authuser=1) file.
-
-### A Quick Note on the README Update:
-
--   **Naming Conventions:** I have updated the documentation to emphasize the `snake_case` (underscore) naming, which is vital for Python import stability.
-
--   **Dual-Controller clarity:** I clearly separated the "Dashboard" vs "CLI" launch instructions, which will save you time when you switch between your PC and your iPad.
-
--   **Professional Standards:** By including the academic and legal references in the README, you ensure that the repository carries the professional weight expected for aviation-related tooling.
+This repository is managed under the terms of the included LICENSE.md file.
 
 *Derived from metrics aligned with standard Aviation Weather operational requirements.*
 
