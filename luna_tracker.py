@@ -5,7 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import telemetry_link
 import datetime
-from datetime import datetime, timedelta
+from telemetry_link import time_manager
+now = time_manager.get_now()
 import astropy.coordinates as coord
 import astropy.units as u
 from astropy.time import Time
