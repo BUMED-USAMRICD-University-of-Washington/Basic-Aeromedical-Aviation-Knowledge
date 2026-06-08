@@ -2,15 +2,14 @@
 import os
 import json
 import time
-import struct
-import h5py
 import numpy as np
-from numba import njit
+import h5py
 
-# Protocol Exporters
+# Standardized Exporters
 from nasa_telemetry_exporter import NASATelemetryExporter
 from lockheed_telemetry_exporter import LockheedTelemetryExporter
 from axiom_telemetry_exporter import AxiomTelemetryExporter
+from northrop_grumman_exporter import NorthropGrummanExporter
 
 class TelemetryDispatcher:
     def __init__(self, output_dir="logs"):
@@ -21,29 +20,30 @@ class TelemetryDispatcher:
         self.nasa = NASATelemetryExporter()
         self.lockheed = LockheedTelemetryExporter()
         self.axiom = AxiomTelemetryExporter()
+        self.northrop = NorthropGrummanExporter()
 
     def dispatch(self, payload):
         """
-        Dispatches telemetry to all active aerospace standards.
+        Global Telemetry Dispatch: Forwards state to all contractor/agency protocols.
         """
-        # 1. Boeing Standard (Ground Monitoring)
+        # 1. Boeing Standard (Ground UI/JSON)
         with open(f"{self.output_dir}/telemetry_{int(time.time())}.json", "w") as f:
             json.dump(payload, f, indent=4)
             
-        # 2. NASA Standards (Archival & Deep Space Interop)
+        # 2. NASA (Science/Deep Space)
         self.nasa.dispatch(payload, self.output_dir)
         
-        # 3. Lockheed Martin Standards (1553B Avionics Bus)
+        # 3. Lockheed Martin (Deterministic Avionics)
         self.lockheed.dispatch(payload, self.output_dir)
         
-        # 4. Axiom Space Standards (Hybrid ISS Docking + ODC Edge)
+        # 4. Axiom Space (Orbital Data Center)
         self.axiom.dispatch(payload, self.output_dir)
         
-        print(f"🚀 Global Telemetry Dispatched: [Boeing] [NASA] [Lockheed] [Axiom]")
+        # 5. Northrop Grumman (Open Mission Systems)
+        self.northrop.dispatch(payload, self.output_dir)
+        
+        print(f"🚀 Global Telemetry Dispatched: [Boeing] [NASA] [Lockheed] [Axiom] [Northrop]")
 
-# ==========================================
-# TEST HOOK
-# ==========================================
 if __name__ == "__main__":
     dispatcher = TelemetryDispatcher()
     test_payload = {
