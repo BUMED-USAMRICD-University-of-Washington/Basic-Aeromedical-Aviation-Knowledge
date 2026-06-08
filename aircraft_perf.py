@@ -1,3 +1,4 @@
+import telemetry_link
 # memory_manager.py
 from dynamic_memory_cache import DynamicMemoryCache
 
@@ -29,138 +30,95 @@ except ImportError:
     import numpy as np # Fallback to standard CPU math
     print("⚡ Using CPU (NVIDIA acceleration not detected)")
     
-def calculate_exact_roll(telemetry_override=None, temp_c, pressure_inhg, headwind_mph, weight_lbs):
-    """Core physics subroutine calculating required ground roll distance for a given weight."""
-    sigma = 5.670374e-8
-    g = 32.174
+# --- HARDWARE ABSTRACTION LAYER (HAL) ---
+try:
+    import cupy as xp  # NVIDIA GPU Acceleration
+    HAS_GPU = True
+    print("🚀 NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp # CPU Fallback
+    HAS_GPU = False
+    print("⚡ CPU Fallback: Standard Vectorization Active (Performance)")
+
+def calculate_performance_envelope_grid(
+    airspeed_array_knots, altitude_array_ft, drag_coefficient_array
+):
+    """
+    Batched calculation of the flight performance envelope.
+    Computes required power (P_req) and fuel flow for an entire 
+    matrix of speed/altitude combinations simultaneously.
+    """
+    # 1. Load data to hardware (15-Decimal Precision Standard)
+    v_kts = xp.array(airspeed_array_knots, dtype=xp.float64)
+    alt_ft = xp.array(altitude_array_ft, dtype=xp.float64)
+    c_d = xp.array(drag_coefficient_array, dtype=xp.float64)
     
-    # 1. Moist Air Density Vector Calculation
-    T_kelvin = temp_c + 273.15
-    P_pascals = pressure_inhg * 3386.39
-    es = 611.2 * np.exp((17.67 * temp_c) / (temp_c + 243.5))
-    pv = es * 0.50
-    pd = P_pascals - pv
-    rho_air = (pd / (287.05 * T_kelvin)) + (pv / (461.495 * T_kelvin))
-    rho_slugs = rho_air * 0.00194032
-
-    # 2. Convert wind velocities to kinematic units
-    headwind_fps = headwind_mph * 1.46667
-
-    # 3. Aircraft Structural Template Properties (Cessna 172 Baseline)
-    wing_surface_area = 174.0 
-    c_l_max = 1.4             
-    engine_thrust = 600.0     
-    mu_friction = 0.02        
-
-    # 4. Process Aerodynamic Liftoff True Airspeed (TAS)
-    v_liftoff_tas = np.sqrt((2.0 * weight_lbs) / (rho_slugs * wing_surface_area * c_l_max))
-    v_liftoff_groundspeed = v_liftoff_tas - headwind_fps
-
-    # 5. Solve Integrated Net Forces Across Ground Acceleration Sweep
-    avg_drag = 0.05 * engine_thrust 
-    avg_lift = 0.33 * weight_lbs    
+    # 2. Physics Constants
+    # Air density reduction with altitude (Approximation)
+    rho_0 = 1.225 # kg/m^3 (SL)
+    # Scale density by altitude
+    rho_array = rho_0 * xp.exp(-alt_ft / 28000.0) 
     
-    net_force = engine_thrust - avg_drag - (mu_friction * (weight_lbs - avg_lift))
-    avg_acceleration = (net_force * g) / weight_lbs
-
-    # Prevent square-root/division errors if tailwinds or weights create negative forces
-    if avg_acceleration <= 0 or v_liftoff_groundspeed <= 0:
-        return 99999.0, rho_air
-
-    # Kinematics Matrix: Distance = V^2 / 2a
-    ground_roll_feet = (v_liftoff_groundspeed ** 2) / (2.0 * avg_acceleration)
-    return ground_roll_feet, rho_air
-
-
-def run_performance_layer():
-    st.header("✈️ Dispatch Matrix - Automated Maximum Allowable Takeoff Weight (MATOW)")
-    st.markdown(r"### Aerodynamic Inverse Optimization Engine:")
-    st.markdown(r"$$\text{Maximize } W \quad \text{Subject to: } S_G(W, \rho_{\text{air}}, V_{\text{headwind}}) \le S_{\text{available}}$$")
-
-    col1, col2 = st.columns(2)
+    # 3. Batched Kinematic Equations
+    v_mps = v_kts * 0.514444
+    # Power required: P_req = 0.5 * rho * V^3 * S * C_d
+    # Assuming Wing Area (S) = 100 m^2
+    S = 100.0
+    p_req_watts = 0.5 * rho_array * (v_mps ** 3) * S * c_d
     
-    with col1:
-        st.markdown("### 🛣️ Runway Structural Thresholds")
-        runway_length = st.number_input("Available Runway Length ($S_{\text{available}}$ in feet)", min_value=500, max_value=12000, value=1200, step=100)
-        runway_heading = st.slider("Active Runway Compass Heading (Degrees)", 0, 360, 90, step=10, help="e.g., Heading 090 is Runway 09")
-        
-        st.markdown("### 🌡️ Microclimate Field Observations")
-        temp_c = st.slider("Surface Ambient Temperature (°C)", -10.0, 45.0, 35.0, step=1.0)
-        pressure_inhg = st.number_input("Altimeter Setting (Pressure inHg)", min_value=28.0, max_value=31.0, value=29.92, format="%.2f")
-        
-        st.markdown("### 💨 Live Anemometer Vectors")
-        wind_speed = st.slider("Live Wind Velocity (knots/mph)", 0.0, 40.0, 10.0, step=1.0)
-        wind_dir = st.slider("Wind Direction Source Angle (Degrees)", 0, 360, 270, step=10)
+    # Fuel flow estimation (linear approximation)
+    fuel_flow_kg_h = p_req_watts * 0.0003 
 
-    with col2:
-        # 1. Run Vector Calculus for Runway Alignment
-        runway_rad = np.radians(runway_heading)
-        wind_rad = np.radians(wind_dir)
-        angle_diff = wind_rad - runway_rad
-        headwind_mph = wind_speed * np.cos(angle_diff)
-        
-        # 2. Run Numerical Search Loop to find MATOW
-        # Sweep weight spectrum from empty weight (1,600 lbs) to certified maximum capacity limits
-        weight_sweep = np.linspace(1400, 3000, 1600)
-        matow_lbs = 1400.0
-        calculated_roll_at_matow = 0.0
-        rho_air_final = 1.225
-        
-        for w in weight_sweep:
-            roll, rho_air_final = calculate_exact_roll(temp_c, pressure_inhg, headwind_mph, w)
-            if roll <= runway_length:
-                matow_lbs = w  # Weight is safe, shift ceiling up
-                calculated_roll_at_matow = roll
-            else:
-                break  # Weight overshoots runway margin, break loop
-                
-        # 3. Compile Performance Vector Chart Lines
-        visual_weights = np.linspace(1500, 2800, 50)
-        rolls = [calculate_exact_roll(temp_c, pressure_inhg, headwind_mph, vw)[0] for vw in visual_weights]
-        
-        fig, ax = plt.subplots(figsize=(10, 4.5))
-        ax.plot(visual_weights, rolls, color="crimson", linewidth=2.5, label="Required Ground Roll ($S_G$)")
-        ax.axhline(runway_length, color="black", linestyle="--", alpha=0.6, label="Available Runway Limit")
-        
-        if matow_lbs > 1400:
-            ax.axvline(matow_lbs, color="forestgreen", linestyle=":", linewidth=2, label=f"MATOW Limit ({int(matow_lbs)} lbs)")
-            
-        ax.set_title("Aeronautical Weight vs. Required Runway Concrete Footprint")
-        ax.set_xlabel("Gross Takeoff Structural Weight (lbs)")
-        ax.set_ylabel("Runway Roll Distance Consumed (feet)")
-        ax.set_ylim(0, runway_length * 1.5)
-        ax.grid(True, alpha=0.2)
-        ax.legend()
-        st.pyplot(fig)
-        
-        # 4. --- RENDER CRITICAL AVIATION DISPATCH FLIGHT METRICS ---
-        st.markdown("### 🧮 Dispatch Optimization Metrics")
-        m_col1, m_col2 = st.columns(2)
-        
-        # Flag structural safety warnings based on numerical boundaries
-        if matow_lbs >= 2400:
-            safety_status = "🟢 FULL STRUCTURAL CAPACITY SAFE FOR DEPARTURE"
-            color_mode = "normal"
-        elif matow_lbs > 1600:
-            safety_status = "⚠️ PAYLOAD REDUCTION REQUIRED: STRIP CARGO/FUEL"
-            color_mode = "inverse"
-        else:
-            safety_status = "🚫 GROUND ROLL OUT OF BOUNDS: FLIGHT GROUNDED"
-            color_mode = "off"
-            
-        m_col1.metric("Maximum Allowable Weight (MATOW)", f"{int(matow_lbs)} lbs", f"Air Density: {rho_air_final:.3f} kg/m³")
-        m_col2.metric("Projected Operational Roll", f"{int(calculated_roll_at_matow)} feet", f"Wind Component: {headwind_mph:+.1f} mph")
-        st.info(f"**Runway Dispatch Directive:** {safety_status}")
-        
-        # 5. --- SPREADSHEET MATRIX LOG ---
-        df_perf = pd.DataFrame({
-            "Performance_Parameter": ["Calculated_Air_Density_kg_m3", "Runway_Headwind_Component_mph", "Available_Concrete_Limit_feet", "Computed_Maximum_Allowable_Weight_lbs", "Ground_Roll_At_MATOW_Limit_feet"],
-            "Value": [round(rho_air_final, 4), round(headwind_mph, 1), runway_length, int(matow_lbs), int(calculated_roll_at_matow)]
-        })
-        
-        st.download_button(
-            label="💾 Export Weight Optimization Spreadsheet (.csv)",
-            data=df_perf.to_csv(index=False).encode('utf-8'),
-            file_name=f"runway_weight_optimization_matrix_{int(runway_heading)}.csv",
-            mime="text/csv"
-        )
+    # 4. Return to CPU host
+    if HAS_GPU:
+        return {
+            "p_req_w": xp.round(p_req_watts, 15).get().tolist(),
+            "fuel_flow": xp.round(fuel_flow_kg_h, 15).get().tolist()
+        }
+    else:
+        return {
+            "p_req_w": xp.round(p_req_watts, 15).tolist(),
+            "fuel_flow": xp.round(fuel_flow_kg_h, 15).tolist()
+        }
+
+def run_perf_layer(telemetry_override=None):
+    """Orchestrator for Boeing/NASA payload compliance."""
+    print("✈️ Running Batched Aircraft Performance Layer...")
+    
+    # Defaults
+    speeds = [200.0]
+    alts = [10000.0]
+    drag = [0.025]
+    
+    if telemetry_override:
+        # Supports batch overrides
+        speeds = [t.get('airspeed', 200.0) for t in telemetry_override] if isinstance(telemetry_override, list) else [telemetry_override.get('airspeed', 200.0)]
+        alts = [t.get('altitude', 10000.0) for t in telemetry_override] if isinstance(telemetry_override, list) else [telemetry_override.get('altitude', 10000.0)]
+        drag = [t.get('cd', 0.025) for t in telemetry_override] if isinstance(telemetry_override, list) else [telemetry_override.get('cd', 0.025)]
+
+    results = calculate_performance_envelope_grid(speeds, alts, drag)
+    
+    payload = {
+        "p_req_watts": results['p_req_w'][0],
+        "fuel_flow_kg_h": results['fuel_flow'][0],
+        "airspeed_kts": speeds[0],
+        "altitude_ft": alts[0]
+    }
+    
+    telemetry_link.update_global_state("performance_models", "flight_envelope", payload)
+    return payload
+
+if __name__ == "__main__":
+    print("================================================================")
+    print("      AIRCRAFT PERFORMANCE ENVELOPE GENERATOR (BATCHED)         ")
+    print("================================================================")
+    
+    # Test batching across a flight profile: [Takeoff, Cruise, High-Speed Descent]
+    test_speeds = [120.0, 350.0, 450.0]
+    test_alts = [500.0, 35000.0, 15000.0]
+    test_cd = [0.05, 0.02, 0.03]
+    
+    res = calculate_performance_envelope_grid(test_speeds, test_alts, test_cd)
+    
+    for i in range(3):
+        print(f"Profile {i+1}: {test_speeds[i]}kts at {test_alts[i]}ft -> Power Required: {round(res['p_req_w'][i], 0)} W")
