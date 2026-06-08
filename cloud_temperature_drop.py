@@ -15,105 +15,105 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
+# --- HARDWARE ABSTRACTION LAYER (HAL) ---
 
-def calculate_future_position():
-    # This respects your manual override if you set one!
-    now = telemetry_link.time_manager.get_now() 
-    future = now + datetime.timedelta(hours=48)
-    return future
+try:
+    import cupy as xp  # NVIDIA GPU Acceleration
+    HAS_GPU = True
+    print("🚀 NVIDIA CUDA Cores Engaged: Array Batching Active (Cloud Temp)")
+except ImportError:
+    import numpy as xp # CPU Fallback
+    HAS_GPU = False
+    print("⚡ CPU Fallback: Standard Vectorization Active (Cloud Temp)")
     
-def simulate_nocturnal_cooling(lwp_g_m2, initial_temp_c=25.0, hours=12.0):
-    """Simulates 12 hours of nighttime radiative cooling by solving the
-    Stefan-Boltzmann surface boundary layer energy equations.
+def calculate_radiative_cooling_grid(
+    lwp_array_g_m2, t_start_c_array, cloud_fraction_array, hours=12.0
+):
     """
-    # 1. Standard Physical Constants & Boundary Parameters
-    sigma = 5.670374e-8  # Stefan-Boltzmann constant (W/m^2*K^4)
-    k_lw = 0.022  # Longwave absorption coefficient for clouds
-    epsilon_a = 0.76  # Emissivity of a clear sky atmosphere
-    epsilon_s = 0.95  # Emissivity of the earth's surface (grass/soil)
-    T_atm_k = 285.15  # Upper-air temperature baseline (12°C in Kelvin)
-    C_s = 30000.0  # Soil layer thermal heat capacity (J/m^2*K)
+    Batched calculation of net temperature drop due to radiative cooling.
+    Processes entire grid arrays simultaneously.
+    """
+    # 1. Load data to hardware (15-Decimal Precision Standard)
+    lwp = xp.array(lwp_array_g_m2, dtype=xp.float64)
+    t_start = xp.array(t_start_c_array, dtype=xp.float64)
+    c_frac = xp.array(cloud_fraction_array, dtype=xp.float64)
+    
+    # 2. Thermodynamic Constants (15-Decimal Precision)
+    SIGMA = 5.670374419000000e-8
+    SPECIFIC_HEAT_AIR = 1005.0 # J/(kg*K)
+    
+    # 3. Radiative Flux (Batched Math)
+    # Cooling rate proportional to cloud emissivity and surface temperature
+    emissivity = 1.0 - xp.exp(-0.022 * lwp)
+    # Stefan-Boltzmann flux approximation for cloud deck
+    net_flux = emissivity * SIGMA * ((t_start + 273.15) ** 4) * c_frac
+    
+    # 4. Energy Balance Integration (12-hour window = 43,200 seconds)
+    total_seconds = hours * 3600.0
+    # temp_drop = (flux * time) / (heat_capacity * mass_layer)
+    # Assuming standard atmospheric column density 
+    temp_drop = (net_flux * total_seconds) / (SPECIFIC_HEAT_AIR * 1000.0)
+    
+    final_temp = t_start - temp_drop
 
-    # 2. Time-stepping Constraints (Numerical Integration Settings)
-    dt = 60.0  # Time step of 1 minute (60 seconds)
-    total_seconds = int(hours * 3600)
-    steps = int(total_seconds / dt)
-
-    # 3. Initialize Dynamic State Arrays
-    T_surface_k = initial_temp_c + 273.15  # Convert starting temp to Kelvin
-
-    # 4. Compute Static Downwelling Cloud Flux Component
-    # Clear sky contribution
-    R_clear_down = epsilon_a * sigma * (T_atm_k**4)
-    # Cloud greenhouse trapping modifier: (1 - exp(-k_lw * LWP))
-    cloud_emissivity_factor = 1.0 - np.exp(-k_lw * lwp_g_m2)
-    R_cloud_down = cloud_emissivity_factor * sigma * (T_surface_k**4) * 0.22
-
-    # Combined total incoming longwave radiation
-    total_longwave_down = R_clear_down + R_cloud_down
-
-    # 5. Core Loop: Run Euler Numerical Integration Across the Night
-    for step in range(steps):
-        # Calculate outgoing upwelling thermal radiation from the ground
-        upwelling_longwave_out = epsilon_s * sigma * (T_surface_k**4)
-
-        # Net Energy Balance Equation (No solar influx at night)
-        Q_net = total_longwave_down - upwelling_longwave_out
-
-        # Temperature tendency derivation step: dT/dt = Q_net / C_s
-        dT_dt = Q_net / C_s
-
-        # Apply time-step increment to current state variable
-        T_surface_k += dT_dt * dt
-
-    # Convert final temperature calculation back to Celsius
-    final_temp_c = T_surface_k - 273.15
-    total_drop_c = initial_temp_c - final_temp_c
-
-    return final_temp_c, total_drop_c, total_longwave_down
-
+    # 5. Return to CPU host
+    if HAS_GPU:
+        return {
+            "drop_c": xp.round(temp_drop, 15).get().tolist(),
+            "final_t": xp.round(final_temp, 15).get().tolist(),
+            "net_flux": xp.round(net_flux, 15).get().tolist()
+        }
+    else:
+        return {
+            "drop_c": xp.round(temp_drop, 15).tolist(),
+            "final_t": xp.round(final_temp, 15).tolist(),
+            "net_flux": xp.round(net_flux, 15).tolist()
+        }
 
 def run_cloud_temp_layer(telemetry_override=None):
-    """
-    Main orchestration function. Extracts live telemetry, runs the high-performance
-    physics simulation, and reports the findings directly to the Boeing JSON payload.
-    """
-    print("🌡️ Running Cloud Temperature Drop Matrix...")
+    """Main orchestration function reporting to Boeing payload."""
+    print("☁️ Running Batched Cloud Radiative Cooling Layer...")
     
-    # 1. Default Parameters
-    t_start = 25.0
-    lwp = 100.0
+    # Default scalar lists
+    lwps = [50.0]
+    temps = [15.0]
+    fractions = [0.8]
     
-    # 2. Parse incoming live telemetry
     if telemetry_override:
-        t_start = telemetry_override.get('temp_c', t_start)
-        lwp = telemetry_override.get('lwp', lwp)
+        if isinstance(telemetry_override, dict):
+            lwps = [telemetry_override.get('lwp', 50.0)]
+            temps = [telemetry_override.get('temp_c', 15.0)]
+            fractions = [telemetry_override.get('cloud_fraction', 0.8)]
+        elif isinstance(telemetry_override, list):
+            lwps = [t.get('lwp', 50.0) for t in telemetry_override]
+            temps = [t.get('temp_c', 15.0) for t in telemetry_override]
+            fractions = [t.get('cloud_fraction', 0.8) for t in telemetry_override]
 
-    # 3. Execute Physics Engine
-    final_t, drop_c, lw_flux = simulate_nocturnal_cooling(
-        lwp_g_m2=float(lwp),
-        initial_temp_c=float(t_start)
-    )
+    results = calculate_radiative_cooling_grid(lwps, temps, fractions)
     
-    # 4. Format Data for the Flight Computer
     payload = {
-        "initial_temp_c": round(float(t_start), 22),
-        "liquid_water_path_g_m2": round(float(lwp), 22),
-        "final_predicted_temp_c": round(float(final_t), 22),
-        "total_temperature_drop_c": round(float(drop_c), 22),
-        "downwelling_longwave_flux_w_m2": round(float(lw_flux), 22)
+        "initial_temp_c": temps[0],
+        "liquid_water_path_g_m2": lwps[0],
+        "final_predicted_temp_c": results['final_t'][0],
+        "total_temperature_drop_c": results['drop_c'][0],
+        "downwelling_longwave_flux_w_m2": results['net_flux'][0]
     }
     
-    # 5. Push to Global Pipeline
-    telemetry_link.update_global_state("atmospheric_models", "cloud_temperature_drop", payload)
-    print("✅ Cloud temperature calculations reported to global state.")
-    
+    telemetry_link.update_global_state("atmospheric_models", "cloud_cooling", payload)
+    print(f"✅ Cloud layer cooling grid reported to global state.")
     return payload
 
-
 if __name__ == "__main__":
-    # Test suite
-    results = run_cloud_temp_layer()
-    print("\n--- TEST RESULTS ---")
-    print(f"Predicted Morning Temperature: {results['final_predicted_temp_c']}°C")
-    print(f"Total Radiative Drop:          {results['total_temperature_drop_c']}°C")
+    print("=================================================================")
+    print("          CLOUD RADIATIVE COOLING ENGINE (BATCHED)               ")
+    print("=================================================================")
+    
+    # Test batching with 3 sectors: [Marine Stratus, Cumulus, High Cirrus]
+    test_lwp = [100.0, 50.0, 5.0]
+    test_temps = [15.0, 10.0, -20.0]
+    test_frac = [0.9, 0.4, 0.1]
+    
+    results = calculate_radiative_cooling_grid(test_lwp, test_temps, test_frac)
+    
+    for i in range(3):
+        print(f"Sector {i+1}: Start: {test_temps[i]}°C -> End: {round(results['final_t'][i], 2)}°C")
