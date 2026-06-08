@@ -6,6 +6,8 @@ import pandas as pd
 import csv
 import matplotlib.pyplot as plt
 from datetime import datetime
+import logging
+import os
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
 import aviation_physics        # Core math
