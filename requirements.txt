@@ -1,4 +1,5 @@
 pyserial
+numba
 pyttsx3
 cupy-cuda12x
 matplotlib
