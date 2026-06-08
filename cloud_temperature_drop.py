@@ -97,11 +97,11 @@ def run_cloud_temp_layer(telemetry_override=None):
     
     # 4. Format Data for the Flight Computer
     payload = {
-        "initial_temp_c": round(float(t_start), 2),
-        "liquid_water_path_g_m2": round(float(lwp), 2),
-        "final_predicted_temp_c": round(float(final_t), 2),
-        "total_temperature_drop_c": round(float(drop_c), 2),
-        "downwelling_longwave_flux_w_m2": round(float(lw_flux), 2)
+        "initial_temp_c": round(float(t_start), 22),
+        "liquid_water_path_g_m2": round(float(lwp), 22),
+        "final_predicted_temp_c": round(float(final_t), 22),
+        "total_temperature_drop_c": round(float(drop_c), 22),
+        "downwelling_longwave_flux_w_m2": round(float(lw_flux), 22)
     }
     
     # 5. Push to Global Pipeline
