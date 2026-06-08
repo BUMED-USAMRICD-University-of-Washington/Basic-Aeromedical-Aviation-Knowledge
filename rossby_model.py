@@ -179,7 +179,7 @@ def run_rossby_layer(telemetry_override=None):
         # --- EXPORT MATRIX LOG ---
         df_rossby = pd.DataFrame({
             "Planetary_Wave_Parameter": ["Target_Latitude_Deg", "Planetary_Beta_Gradient_m_s", "Zonal_Wavelength_km", "Adjusted_Jet_Core_Speed_m_s", "Calculated_Wave_Phase_Speed_m_s", "Cross_Country_Migration_km_day"],
-            "Calculated_Value": [round(station_lat, 4), f"{beta_planetary:.4e}", round(wavelength_x / 1000.0, 1), round(u_adjusted, 2), round(phase_speed_c, 2), round(progression_rate_km_day, 1)]
+            "Calculated_Value": [round(station_lat, 15), f"{beta_planetary:.4e}", round(wavelength_x / 1000.0, 15), round(u_adjusted, 15), round(phase_speed_c, 15), round(progression_rate_km_day, 15)]
         })
         
         st.download_button(
