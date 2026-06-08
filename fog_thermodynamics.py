@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from numba import njit
 import telemetry_link
 import datetime
+from telemetry_link import time_manager
+now = time_manager.get_now()
 # --- SECONDARY ENGINE DEPENDENCIES ---
 import telemetry_link          # NEW: Integrated Centralized Data Bus
 import aviation_physics        # Core math
