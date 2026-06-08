@@ -1,3 +1,10 @@
+# memory_manager.py
+from dynamic_memory_cache import DynamicMemoryCache
+
+# Create one shared cache instance for the whole app
+shared_cache = DynamicMemoryCache(percentage=0.25)
+
+import multiprocessing as mp
 # --- PRIMARY ENGINE: Galactic Telemetry & FAA Flight Logging ---
 import os
 import json
@@ -9,6 +16,13 @@ import numpy as np
 from astropy.coordinates import EarthLocation, ITRS, GCRS, Galactocentric, CartesianRepresentation
 from astropy.time import Time
 import astropy.units as u
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
 
 class GalacticFlightTracker:
     """
