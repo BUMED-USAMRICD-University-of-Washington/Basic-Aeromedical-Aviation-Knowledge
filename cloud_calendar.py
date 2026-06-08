@@ -2,7 +2,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-now = datetime.utcnow()
+import telemetry_link
+import datetime
 # --- SECONDARY ENGINE DEPENDENCIES ---
 import aviation_physics        # Core math
 import aviation_telemetry      # Data flow
@@ -11,6 +12,11 @@ import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
 
+def calculate_future_position():
+    # This respects your manual override if you set one!
+    now = telemetry_link.time_manager.get_now() 
+    future = now + datetime.timedelta(hours=48)
+    return future
 def run_calendar_arc_layer(telemetry_override=None):
     st.header("📅 12-Month Multi-Scenario Comparative Engine")
     st.markdown(r"Toggle independent IPCC Shared Socioeconomic Pathways (SSPs) on or off to visually compare cloud density paths ($\Delta LWP$) on a single layout.")
