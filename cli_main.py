@@ -179,3 +179,15 @@ def regen_docs():
 @app.command()
 def config(
     key: str = typer.Argument(...,
+
+                              # Add this underneath your existing @app.command() decorators in cli_main.py
+
+@app.command()
+def weather(ident: str = typer.Argument(..., help="ICAO code to generate report for")):
+    """Generate and export AI-METAR and AI-TAF reports."""
+    from ai_weather_reporter import AIWeatherReporter
+    reporter = AIWeatherReporter()
+    typer.echo(f"Generatng Synthetic Weather Observation for {ident.upper()}...")
+    reports = reporter.export_reports(ident)
+    if reports:
+        typer.secho(f"\n{reports[0]}", fg=typer.colors.CYAN),
