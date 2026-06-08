@@ -22,6 +22,33 @@ class WaypointManager:
         self.dso_catalog_path = dso_catalog_path
         self.waypoints = []
         self.active_space_target = None
+        self.s_turn_enabled = False # Default state: PRO Math
+        
+    def set_s_turn_mode(self, enabled: bool):
+        """Selector toggle for the S-Turn energy management system."""
+        self.s_turn_enabled = enabled
+        logging.info(f"S-Turn Mode: {'ENABLED' if enabled else 'DISABLED'}")
+
+    def calculate_tactical_approach(self, ship_pos, ship_vel, target_lat, target_lon):
+        """
+        Tactical Approach Interface.
+        Uses Standard Math by default; switches to Energy Management if s_turn_enabled is True.
+        """
+        # 1. Kinematic Intercept (Standard Math - Preserved)
+        intercept = self.calculate_universal_intercept(ship_pos, ship_vel)
+        
+        # 2. Conditional Energy Management Logic
+        if self.s_turn_enabled:
+            # Only trigger thermal feasibility check if user enabled the selector
+            v_mag = np.linalg.norm(ship_vel)
+            alt = np.linalg.norm(ship_pos) - 6371000
+            safety = self.entry_controller.evaluate_approach_safety(v=v_mag, h=alt, alpha=35.0)
+            
+            if not safety['is_safe']:
+                return self._inject_s_turn_maneuver(intercept)
+        
+        # Returns standard intercept if S-Turn is False
+        return intercept
         
         # Load and Validate Configuration
         self.config = self._load_and_validate_config()
