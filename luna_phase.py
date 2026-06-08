@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 import matplotlib.pyplot as plt
-
+import telemetry_link
+import datetime
 # --- SECONDARY ENGINE DEPENDENCIES ---
 import aviation_physics        # Core math
 import aviation_telemetry      # Data flow
@@ -22,7 +23,11 @@ except ImportError:
 from numba import njit
 
 @njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
-    
+def calculate_future_position():
+    # This respects your manual override if you set one!
+    now = telemetry_link.time_manager.get_now() 
+    future = now + datetime.timedelta(hours=48)
+    return future    
 def run_lunar_phase_modulation():
     print("\n--- Lunar Synodic Phase Anomaly Map ---")
     target_month_start = float(input("Enter start index day of lunar calendar (0 = New Moon): "))
