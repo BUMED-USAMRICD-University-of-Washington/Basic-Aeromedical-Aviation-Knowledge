@@ -1,103 +1,88 @@
-# --- PRIMARY ENGINE: Telemetry Export & Archival ---
+# --- PRIMARY ENGINE: Multi-Protocol Telemetry Dispatcher ---
 import os
 import json
-import h5py
-import struct
 import time
+import struct
+import h5py
 import numpy as np
+from numba import njit
+import multiprocessing as mp
 
-# Importing standard dependencies
-import telemetry_link
-
-class TelemetryDispatcher:
-    """
-    Simultaneously exports flight state to Boeing-compatible JSON
-    and NASA-compliant binary/HDF5 formats.
-    """
-    
-    # NASA CCSDS Binary Packet structure: [Sync(2)][ID(2)][Time(8)][Data(48)]
-    PACKET_FORMAT = ">HHd12f" 
+# =====================================================================
+# NASA EXPORTER (HDF5 + CCSDS Binary)
+# =====================================================================
+class NASATelemetryExporter:
+    PACKET_FORMAT = ">HHd12f" # Sync, ID, Time, Data
     SYNC_WORD = 0xEB90
 
+    def dispatch(self, payload, output_dir):
+        # 1. Binary Stream
+        packet = struct.pack(self.PACKET_FORMAT, self.SYNC_WORD, 0x0001, time.time(), 
+                             *[payload.get(k, 0.0) for k in ['temp_c', 'pressure_hpa', 'lat', 'lon', 'alt']]+[0.0]*7)
+        with open(f"{output_dir}/nasa_stream.bin", "ab") as f: f.write(packet)
+        
+        # 2. HDF5 Grid
+        if 'grid_data' in payload:
+            with h5py.File(f"{output_dir}/instrument_archive.h5", 'a') as f:
+                dset = f.create_dataset(f"sensor_grid_{int(time.time())}", data=payload['grid_data'], compression="gzip")
+                dset.attrs['timestamp'] = time.time()
+
+# =====================================================================
+# LOCKHEED MARTIN EXPORTER (MIL-STD-1553B)
+# =====================================================================
+class LockheedTelemetryExporter:
+    PACKET_FORMAT = ">HHH16H" # Header(3) + 16 Data Words
+
+    @staticmethod
+    @njit(fastmath=True)
+    def fast_convert_to_fixed_point(data_array):
+        output = np.zeros(len(data_array), dtype=np.uint16)
+        for i in range(len(data_array)):
+            output[i] = int(data_array[i] * 1000.0) & 0xFFFF
+        return output
+
+    def dispatch(self, payload, output_dir):
+        stream = np.array([payload.get(k, 0.0) for k in ['temp_c', 'pressure_hpa', 'lat', 'lon', 'alt', 'pitch', 'roll', 'yaw']] + [0.0]*8)
+        fixed_words = self.fast_convert_to_fixed_point(stream)
+        packet = struct.pack(self.PACKET_FORMAT, 0x8000, 0x0001, len(fixed_words), *fixed_words)
+        with open(f"{output_dir}/lockheed_bus_dump.bin", "ab") as f: f.write(packet)
+
+# =====================================================================
+# MASTER DISPATCHER
+# =====================================================================
+class TelemetryDispatcher:
     def __init__(self, output_dir="logs"):
         self.output_dir = output_dir
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        if not os.path.exists(output_dir): os.makedirs(output_dir)
+        self.nasa_exporter = NASATelemetryExporter()
+        self.lockheed_exporter = LockheedTelemetryExporter()
 
     def dispatch(self, payload):
-        """
-        The master export trigger. Pushes data to all configured endpoints.
-        """
-        # 1. Boeing-Standard JSON Export
-        self._export_json(payload)
-        
-        # 2. NASA-Standard Binary Packet (Real-time Telemetry)
-        self._export_nasa_binary(payload)
-        
-        # 3. NASA-Standard HDF5 (Instrument/Spatial Grid Data)
-        # Assuming payload contains complex arrays or grid metrics
-        if 'grid_data' in payload:
-            self._export_hdf5(payload['grid_data'])
-
-    def _export_json(self, payload):
-        timestamp = int(time.time())
-        filename = f"{self.output_dir}/telemetry_{timestamp}.json"
-        with open(filename, "w") as f:
+        """Dispatches telemetry simultaneously to all standards."""
+        # 1. Boeing JSON
+        with open(f"{self.output_dir}/telemetry_{int(time.time())}.json", "w") as f:
             json.dump(payload, f, indent=4)
-        print(f"📄 Boeing JSON Logged: {filename}")
-
-    def _export_nasa_binary(self, payload):
-        """Serializes telemetry into a compact NASA-style binary stream."""
-        # Map telemetry to float list
-        data_packet = [
-            payload.get('temp_c', 0.0),
-            payload.get('pressure_hpa', 0.0),
-            payload.get('lat', 0.0),
-            payload.get('lon', 0.0),
-            payload.get('alt', 0.0),
-            *[0.0]*7 # Padding
-        ]
+            
+        # 2. NASA
+        self.nasa_exporter.dispatch(payload, self.output_dir)
         
-        packet = struct.pack(
-            self.PACKET_FORMAT,
-            self.SYNC_WORD,
-            0x0001, # Packet ID
-            time.time(),
-            *data_packet
-        )
+        # 3. Lockheed Martin
+        self.lockheed_exporter.dispatch(payload, self.output_dir)
         
-        with open(f"{self.output_dir}/nasa_stream.bin", "ab") as f:
-            f.write(packet)
-        print(f"📦 NASA Binary Packet Appended")
+        print(f"📡 Telemetry dispatched to [JSON/Boeing] [BIN/NASA] [BIN/Lockheed]")
 
-    def _export_hdf5(self, grid_data):
-        """Archives multi-dimensional instrument data (e.g., radar/weather)."""
-        filename = f"{self.output_dir}/instrument_archive.h5"
-        dataset_name = f"sensor_grid_{int(time.time())}"
-        
-        with h5py.File(filename, 'a') as f:
-            dset = f.create_dataset(dataset_name, data=grid_data, compression="gzip")
-            dset.attrs['units'] = 'SI'
-            dset.attrs['timestamp'] = time.time()
-        print(f"🧬 NASA HDF5 Archive Updated: {dataset_name}")
-
-# ==========================================
-# Integration Hook
-# ==========================================
-def export_telemetry_loop(payload):
-    dispatcher = TelemetryDispatcher()
-    dispatcher.dispatch(payload)
-    return True
-
+# =====================================================================
+# EXECUTION HOOK
+# =====================================================================
 if __name__ == "__main__":
-    # Test suite to verify the dual-dispatch functionality
+    dispatcher = TelemetryDispatcher()
+    
+    # Payload simulating an integrated instrument state
     test_payload = {
-        "temp_c": 15.5, 
-        "pressure_hpa": 1013.2, 
-        "lat": 47.4480, 
-        "lon": -122.3088, 
-        "alt": 3000.0,
+        "temp_c": 15.5, "pressure_hpa": 1013.2, 
+        "lat": 47.4480, "lon": -122.3088, "alt": 3000.0,
+        "pitch": 5.0, "roll": 0.0, "yaw": 180.0,
         "grid_data": np.random.rand(10, 10)
     }
     
-    export_telemetry_loop(test_payload)
+    dispatcher.dispatch(test_payload)
