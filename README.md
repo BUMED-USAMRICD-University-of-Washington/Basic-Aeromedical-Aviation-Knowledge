@@ -144,17 +144,17 @@ This repository relies on a highly specific stack of mathematical, spatial, and 
 
 -   pydantic: Enforces strict data schemas for incoming aviation telemetry packets, ensuring that GPS coordinates, barometric inputs, and sensor data meet required constraints before they enter the simulation pipeline.
 
--   pyserial
+-   pyserial: Interfaces with the hardware serial ports (COM/tty) of your flight computer, enabling the physical connection to external devices like USB DGPS receivers and precision barometric elevation sensors.
 
 -   pyttsx3: Converts critical flight advisory, stall warnings, and system alert data into auditory outputs for in-flight notification, reducing pilot "heads-down" time by providing hands-free status updates.
 
 -   cupy-cuda12x: Offloads massive mathematical array operations to NVIDIA GPUs, providing the hardware-accelerated parallel processing required for real-time planetary wave matrices and large-scale atmospheric modeling.
 
--   matplotlib
+-   matplotlib: Renders 2D spatial cross-sections, jet stream trajectories, temperature timeline visualizations, and wave profile plots directly onto the Streamlit dashboard, transforming complex atmospheric physics matrices into intuitive visual aids for flight planning and situational awareness.
 
 -   astropy: Computes high-precision celestial and topocentric coordinates, critical for tracking lunar/solar positions to calculate real-time solar irradiance and celestial-based navigation offsets.
 
--   requests
+-   requests: Executes HTTP requests to fetch external data, such as real-time meteorological conditions or baseline climatological data (e.g., T_rural) from the USCRN API, ensuring your local models are updated with current environmental inputs.
 
 -   psutil: Monitors the system resources of the flight computer, ensuring that intensive physics simulations (like the Rossby Wave Engine) do not starve the real-time telemetry processing loops of necessary CPU and RAM.
 
