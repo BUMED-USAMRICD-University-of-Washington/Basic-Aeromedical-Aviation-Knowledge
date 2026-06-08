@@ -1,142 +1,181 @@
-# --- PRIMARY ENGINE: Space Weather ---
+# --- PRIMARY ENGINE: Space Weather & Kinematics ---
 import os
 import struct
+import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from numba import njit
-import multiprocessing as mp
+from astropy.coordinates import SkyCoord, FK5
+import astropy.units as u
+from astropy.time import Time
 
 # --- SECONDARY ENGINE DEPENDENCIES ---
-import telemetry_link          # NEW: Integrated Centralized Data Bus
-import aviation_physics        # Core math
-import aviation_telemetry      # Data flow
-import aircraft_perf           # Performance calculations
-import sensor_thermodynamics   # Env data scaling
-import aerodynamic_matrix      # Lift/Drag logic
-import streamlit as st
+import telemetry_link          
+import aviation_physics        
 
-try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
-    print("🚀 NVIDIA GPU Acceleration Engaged")
-except ImportError:
-    import numpy as np # Fallback to standard CPU math
-    print("⚡ Using CPU (NVIDIA acceleration not detected)")
-
-
-# space_weather_engine.py
-# Tracks astronomical and solar forcing indices to offset city base grids
-# AND evaluates Deep Sky Object (DSO) masses and gravitational fields.
-
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
-def calculate_astronomical_offsets(solar_flux_f107, galactic_ray_count):
+class KinematicForceEngine:
     """
-    Calculates the fractional shift in Total Solar Irradiance (TSI)
-    and cosmic ionization scaling factor from space gas tracking.
+    Calculates planetary velocities, rotations, and applies 
+    environmental force corrections (J2 oblateness & Space Wind).
     """
-    # Calculates the fractional shift in Total Solar Irradiance (TSI)
-    # over the 11-year solar cycle
-    delta_tsi_forcing = (solar_flux_f107 / 1361.0) * 0.25
-    
-    # Calculates cosmic ionization scaling factor from space gas tracking
-    cosmic_variance = galactic_ray_count * 1.38e-23
-    
-    return delta_tsi_forcing, cosmic_variance
+    def __init__(self): 
+        # Universal Gravitational Constant (m^3 kg^-1 s^-2)
+        self.G = 6.67430e-11
 
-@njit(fastmath=True)
-def compute_stellar_mass_and_gravity_vectorized(mags_array):
-    """
-    High-performance vectorized calculation of Stellar Masses using the
-    empirical Mass-Luminosity relation (L proportional to M^3.5),
-    and a Net Gravitational Field sum calculation.
-    """
-    G = 6.67430e-11 # Universal Gravitational Constant
-    mass_solar_kg = 1.989e30
-    
-    masses_solar = np.zeros_like(mags_array)
-    net_g_field = 0.0
-    
-    for i in range(len(mags_array)):
-        # L/L_sun = 10 ^ (0.4 * (M_sun - M_star)) | Absolute mag of Sun ~ 4.83
-        lum_ratio = 10 ** (0.4 * (4.83 - mags_array[i]))
+    def calculate_kinematics_and_forces(
+        self,
+        pos_t1,
+        pos_t2,
+        dt,
+        planet_mass,
+        planet_radius,
+        ship_mass,
+        ship_area,
+        drag_coeff,
+        wind_velocity_vec,
+        wind_density,
+        j2_factor
+    ):
+        """
+        Processes multiple spatial readings to extract velocity and apply corrections.
+        """
+        # 1. Planetary Velocity Vector
+        # v = (r2 - r1) / dt
+        velocity_vec = (np.array(pos_t2) - np.array(pos_t1)) / dt
+        velocity_mag = np.linalg.norm(velocity_vec)
+
+        # 2. Baseline Spherical Gravity (using pos_t2 as current location)
+        r_vec = np.array(pos_t2)
+        r_mag = np.linalg.norm(r_vec)
         
-        # M = L^(1/3.5)
-        mass_s = lum_ratio ** (1/3.5)
-        masses_solar[i] = mass_s
+        # Fg = G * (m1 * m2) / r^2
+        gravity_force_mag = self.G * (planet_mass * ship_mass) / (r_mag**2)
+        # Unit vector pointing towards the center of mass
+        r_hat = -r_vec / r_mag 
+        gravity_vec = gravity_force_mag * r_hat
+
+        # 3. Oblateness Correction (J2 Perturbation)
+        # Simplified acceleration correction for a ship at latitude phi
+        # Assuming z-axis is polar, latitude approximation: sin(phi) = z / r
+        sin_phi = r_vec[2] / r_mag if r_mag != 0 else 0
+        j2_accel_factor = -(3/2) * j2_factor * (self.G * planet_mass / (r_mag**2)) * ((planet_radius / r_mag)**2)
         
-        # Gravitational field contribution equation: g_net = G * M / R^2
-        # Assuming a normalized R distance approximation (e.g. 100 lightyears in meters) for baseline engine testing
-        m_kg = mass_s * mass_solar_kg
-        r_normalized_m = 9.461e15 * 100.0 
+        a_x = j2_accel_factor * (1 - 5 * sin_phi**2) * (r_vec[0] / r_mag)
+        a_y = j2_accel_factor * (1 - 5 * sin_phi**2) * (r_vec[1] / r_mag)
+        a_z = j2_accel_factor * (3 - 5 * sin_phi**2) * (r_vec[2] / r_mag)
         
-        # Summing the scalar field
-        net_g_field += (G * m_kg) / (r_normalized_m ** 2)
+        j2_accel_vec = np.array([a_x, a_y, a_z])
+        j2_force_vec = j2_accel_vec * ship_mass
+
+        # 4. Space Wind Drag Force
+        # F_wind = 0.5 * rho * Cd * A * |V_rel| * V_rel
+        v_rel_vec = np.array(wind_velocity_vec) - velocity_vec
+        v_rel_mag = np.linalg.norm(v_rel_vec)
         
-    return masses_solar, net_g_field
+        wind_force_vec = 0.5 * wind_density * drag_coeff * ship_area * v_rel_mag * v_rel_vec
 
-def parse_stellarium_catalog(file_path):
+        # 5. Net Rectified Force
+        total_force_vec = gravity_vec + j2_force_vec + wind_force_vec
+
+        return {
+            "orbital_velocity_m_s": velocity_mag,
+            "velocity_vector": velocity_vec,
+            "pure_gravitational_force_n": gravity_vec,
+            "j2_gravitational_correction_n": j2_force_vec,
+            "space_wind_force_n": wind_force_vec,
+            "total_corrected_force_field_n": total_force_vec
+        }
+
+
+def get_jnow_coordinates(ra_hms: str, dec_dms: str, distance_kpc: float) -> dict:
     """
-    Parses the Stellarium catalog-3.23.dat file.
-    Returns a Pandas DataFrame containing the extracted celestial objects.
+    Converts static J2000 catalog coordinates to real-time JNow 
+    Cartesian vectors based on the current system clock.
     """
-    if not os.path.exists(file_path):
-        return None
-
-    # Method 1: Attempt to read as Tab-Separated Text (TSV) or CSV
-    try:
-        with open(file_path, 'rb') as f:
-            header_check = f.read(4)
-            
-        if b'\x00' not in header_check:
-            df = pd.read_csv(
-                file_path, 
-                sep='\t',
-                comment='#',
-                low_memory=False,
-                names=["ID", "RA", "Dec", "Type", "Morph_Type", "Mag", "Size_Arcmin", "Orientation", "Name"]
-            )
-            df = df.dropna(subset=['RA', 'Dec', 'Mag'])
-            return df
-            
-    except Exception:
-        pass
-
-    # Method 2: Binary Struct Parsing (Fallback for compiled catalogs)
-    objects = []
-    with open(file_path, 'rb') as f:
-        header_data = f.read(32) 
-        record_size = 24 
-        while True:
-            record = f.read(record_size)
-            if not record or len(record) < record_size:
-                break
-            try:
-                unpacked_data = struct.unpack('<iffffi', record)
-                objects.append({
-                    "ID": unpacked_data[0],
-                    "RA": unpacked_data[1],
-                    "Dec": unpacked_data[2],
-                    "Mag": unpacked_data[3],
-                    "Size_Arcmin": unpacked_data[4],
-                    "Type": unpacked_data[5]
-                })
-            except struct.error:
-                break
-
-    df = pd.DataFrame(objects)
-    return df.dropna(subset=['Mag'])
-
-def run_space_layer(telemetry_override=None):
-    """
-    Main orchestration function. Extracts live telemetry, runs the high-performance
-    physics simulation, and reports the findings directly to the Boeing JSON payload.
-    """
-    print("🌌 Running Space Weather Engine...")
+    current_utc_time = Time.now()
     
-    # 1. Default Space Weather Baseline (Average Solar Day)
-    f107_flux = 150.0  # Solar Flux Units (sfu)
-    gcr_count = 5000.0 # Galactic Cosmic Ray counts per minute
+    # Define baseline J2000 coordinate
+    j2000_coord = SkyCoord(
+        ra=ra_hms, 
+        dec=dec_dms, 
+        distance=distance_kpc * u.kpc, 
+        frame='icrs'
+    )
     
-    # 2. Parse incoming live telemetry
-    if telemetry_override:
-        f107_flux = telemetry_override.get('solar_flux_f107', f107_flux)
-        gcr_count = telemetry_override.get('galactic_ray_count', gcr_
+    # Precess to exact current date (JNow)
+    jnow_coord = j2000_coord.transform_to(FK5(equinox=current_utc_time))
+    
+    # Extract to Cartesian meters for the physics engine
+    jnow_cartesian = jnow_coord.cartesian
+    
+    return {
+        "epoch_utc": current_utc_time.iso,
+        "jnow_ra_deg": jnow_coord.ra.deg,
+        "jnow_dec_deg": jnow_coord.dec.deg,
+        "vector_x_meters": jnow_cartesian.x.to(u.m).value,
+        "vector_y_meters": jnow_cartesian.y.to(u.m).value,
+        "vector_z_meters": jnow_cartesian.z.to(u.m).value,
+        "vector_array": [
+            jnow_cartesian.x.to(u.m).value, 
+            jnow_cartesian.y.to(u.m).value, 
+            jnow_cartesian.z.to(u.m).value
+        ]
+    }
+
+
+def execute_tracking_loop():
+    """
+    Example orchestration showing how to pull sequential JNow readings
+    and compute the kinematic force corrections.
+    """
+    print("--- 🌌 Initializing Advanced Kinematics Tracking ---")
+    
+    # Target: Andromeda Galaxy (Example target for deep space)
+    # In a live scenario, you would pull RA/Dec directly from your Stellarium parser.
+    target_ra = '00h42m44.3s'
+    target_dec = '+41d16m09s'
+    target_dist_kpc = 765.0 
+    
+    print("Fetching Reading 1 (T1)...")
+    reading_1 = get_jnow_coordinates(target_ra, target_dec, target_dist_kpc)
+    pos_t1 = reading_1['vector_array']
+    
+    # Simulate a time delta (e.g., 60 seconds passing between telemetry readings)
+    dt_seconds = 60.0 
+    
+    # In reality, you wait for the tick, but we simulate movement by adjusting the vector
+    # slightly for demonstration purposes of the math.
+    pos_t2 = [pos_t1[0] + 15000, pos_t1[1] - 8000, pos_t1[2] + 2000] 
+    
+    # Initialize the Kinematic Engine
+    engine = KinematicForceEngine()
+    
+    # Compute dynamics (Using sample planetary/ship masses)
+    results = engine.calculate_kinematics_and_forces(
+        pos_t1=pos_t1,
+        pos_t2=pos_t2,
+        dt=dt_seconds,
+        planet_mass=1.5e24,       # Target mass (kg)
+        planet_radius=6000e3,     # Target radius (m)
+        ship_mass=50000.0,        # Aircraft/Spacecraft mass (kg)
+        ship_area=120.0,          # Cross-sectional area (m^2)
+        drag_coeff=2.2,           # Drag coefficient
+        wind_velocity_vec=[400000, 0, 0], # Solar wind velocity vector (m/s)
+        wind_density=1e-12,       # Plasma density (kg/m^3)
+        j2_factor=0.00108         # Oblateness harmonic 
+    )
+
+    print(f"\n--- JNow Synchronization Epoch: {reading_1['epoch_utc']} ---")
+    print(f"JNow RA/Dec: {reading_1['jnow_ra_deg']:.4f}°, {reading_1['jnow_dec_deg']:.4f}°")
+    
+    print("\n=== KINEMATIC & FORCE TELEMETRY ===")
+    print(f"Velocity Vector (m/s): {np.round(results['velocity_vector'], 2)}")
+    print(f"Absolute Speed:        {results['orbital_velocity_m_s']:.2f} m/s")
+    
+    print("\n--- Force Decompositions (Newtons) ---")
+    print(f"Baseline Gravity: {np.round(results['pure_gravitational_force_n'], 2)} N")
+    print(f"J2 Shape Variance:{np.round(results['j2_gravitational_correction_n'], 2)} N")
+    print(f"Space Wind Drag:  {np.round(results['space_wind_force_n'], 2)} N")
+    print(f"\nTOTAL NET RECTIFIED FORCE VECTOR: {np.round(results['total_corrected_force_field_n'], 2)} N")
+
+
+if __name__ == "__main__":
+    execute_tracking_loop()
