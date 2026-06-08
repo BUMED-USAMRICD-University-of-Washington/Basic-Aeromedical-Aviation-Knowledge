@@ -7,6 +7,7 @@ from typing import Optional
 from export_telemetry import TelemetryDispatcher
 from waypoint_manager import WaypointManager
 from flight_control_dynamics import FlightControlDynamics
+from airport_data_manager import manager
 
 # --- 1. SYSTEM CONFIGURATION ---
 SRC_DIR = "src"
