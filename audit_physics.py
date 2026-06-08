@@ -1,6 +1,8 @@
 # audit_physics.py
 import rossby_model
 import aviation_physics
+import telemetry_link
+from telemetry_link import time_manager
 import flight_control_dynamics
 
 def audit():
