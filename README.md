@@ -49,17 +49,25 @@ Core Features
 Installation & Setup
 ------------------------
 
-1.  Clone the Repository:
+### Clone the Repository:
 
+Bash
+
+```
     git clone [https://github.com/FADM-DCMN-CORY-A-HOFSTAD-USN/Basic-Aviation-Knowledge.git](https://www.google.com/search?q=https://github.com/FADM-DCMN-CORY-A-HOFSTAD-USN/Basic-Aviation-Knowledge.git&authuser=1)
 
     cd Basic-Aviation-Knowledge
+```
 
-2.  Install Dependencies:
+### Install Dependencies:
 
     Ensure you have Python 3.9+ installed, then run:
 
+Bash
+
+```
     pip install -r requirements.txt
+```
 
 ### Validation & Readiness
 
