@@ -1,59 +1,71 @@
-# --- PRIMARY ENGINE: Aviation Avionics TUI ---
-import os
-import time
+# app.py
+import typer
 import logging
+import time
+import os
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Input, RichLog
 from textual.containers import Vertical, Horizontal
+
+# --- CORE INTEGRATION MODULES ---
 from telemetry_link import TelemetryDispatcher
 from waypoint_manager import WaypointManager
 from flight_control_dynamics import FlightControlDynamics
 from export_telemetry import TelemetryDispatcher as GlobalDispatcher
+from schema_validator import validate_configuration
+import aviation_physics
+import rossby_model
+import fog_thermodynamics
+import radiation_model
 
-# --- SAFETY WRAPPER ---
+# --- SAFETY WRAPPER: MISSION CRITICAL ---
 def avionics_safety_wrapper(func):
-    """Decorator to isolate physics failures from the TUI event loop."""
+    """Isolates physics/IO from the TUI event loop."""
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            logging.error(f"AVIONICS CRITICAL: {e}")
+            logging.error(f"SYSTEM FAULT: {e}")
             return None
     return wrapper
 
+# --- TUI ARCHITECTURE ---
 class AviationConsole(App):
-    """
-    FAA-Compliant Avionics Interface.
-    Local data ingestion: /src
-    """
     CSS = """
     Screen { align: center middle; }
-    #control-panel { width: 40%; height: 100%; border: solid green; }
-    #log-panel { width: 60%; height: 100%; border: solid white; }
+    #control-panel { width: 30%; height: 100%; border: solid green; }
+    #log-panel { width: 70%; height: 100%; border: solid white; }
     """
     
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("d", "dispatch_all", "Dispatch Global Telemetry"),
-        ("s", "run_master_sequence", "Run Boeing Master Sequence")
+        ("d", "dispatch_telemetry", "Dispatch Global Telemetry"),
+        ("m", "run_master_physics", "Run Boeing Master Sequence")
     ]
 
+    def __init__(self, mode: str, target: str):
+        super().__init__()
+        self.mode = mode
+        self.target = target
+
     def on_mount(self):
-        # Data paths
-        src_dir = "src"
-        catalog_path = os.path.join(src_dir, "catalog-3.23.dat")
-        
-        # System Init
-        self.nav = WaypointManager(dso_catalog_path=catalog_path)
-        self.dispatcher = GlobalDispatcher(output_dir="logs")
         self.logger = self.query_one(RichLog)
-        self.logger.write("SYSTEM INITIALIZED: Local Data Bus Active.")
+        self.logger.write(f"SYSTEM BOOT: [Mode: {self.mode}] [Target: {self.target}]")
+        
+        # Initialize Logic Engines
+        try:
+            self.nav = WaypointManager()
+            self.computer = FlightControlDynamics(mode=self.mode)
+            self.dispatcher = GlobalDispatcher(output_dir="logs")
+            self.logger.write("SUCCESS: Avionics Engines Linked.")
+        except Exception as e:
+            self.logger.write(f"CRITICAL: Init Failed: {e}")
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Horizontal(
             Vertical(
-                Static("FLIGHT CONTROL", id="header"),
+                Static("FLIGHT CONSOLE", id="header"),
                 Input(placeholder="Override: KEY=VAL", id="input"),
                 Static("Status: NOMINAL", id="status"),
             ),
@@ -63,31 +75,36 @@ class AviationConsole(App):
 
     @avionics_safety_wrapper
     def on_input_submitted(self, event: Input.Submitted):
-        """Input handler for rapid parameter changes."""
         key, val = event.value.split("=")
-        # Example update to flight dynamics/config
-        self.logger.write(f"SYSTEM OVERRIDE: {key} -> {val}")
+        self.logger.write(f"PARAM_UPDATE: {key} -> {val}")
         self.query_one("#status").update(f"ACTIVE: {key.upper()} SET")
         self.query_one("#input").value = ""
 
-    def action_dispatch_all(self):
-        """Forces immediate dispatch to all 6 aerospace protocols."""
-        payload = {"temp_c": 15.0, "alt": 3000, "timestamp": time.time()}
+    def action_dispatch_telemetry(self):
+        payload = {"temp_c": 15.0, "alt": 3000, "target": self.target}
         self.dispatcher.dispatch(payload)
-        self.logger.write("GLOBAL DISPATCH: Boeing, NASA, Lockheed, Axiom, Northrop, OAAM updated.")
+        self.logger.write("DISPATCH: Boeing, NASA, Lockheed, Axiom, Northrop, OAAM.")
 
-    def action_run_master_sequence(self):
-        """Runs the thermodynamics sequence."""
-        self.logger.write("MASTER SEQUENCE: Executing physics layer...")
-        # Add master sequence logic here from cli_main
-        self.logger.write("MASTER SEQUENCE: Complete.")
+    def action_run_master_physics(self):
+        self.logger.write("SEQUENCE: Executing Boeing Thermodynamics...")
+        # Invoke core modules directly
+        fog_thermodynamics.run_fog_layer()
+        rossby_model.run_rossby_layer()
+        radiation_model.run_radiation_layer()
+        self.logger.write("SEQUENCE: Physics layers synced.")
+
+# --- TYPER CLI ENTRY POINT ---
+app = typer.Typer()
+
+@app.command()
+def start(
+    mode: str = typer.Option("TACTICAL", help="Flight Profile"),
+    target: str = typer.Option("Earth", help="Destination")
+):
+    """Initialize the integrated aviation knowledge console."""
+    console = AviationConsole(mode=mode, target=target)
+    console.run()
 
 if __name__ == "__main__":
-    # Ensure src data exists
-    if not os.path.exists("src"):
-        print("CRITICAL ERROR: /src data directory not found.")
-        exit(1)
-        
     logging.basicConfig(filename="flight_system.log", level=logging.ERROR)
-    app = AviationConsole()
-    app.run()
+    app()
