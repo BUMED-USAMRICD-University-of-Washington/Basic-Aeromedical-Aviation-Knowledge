@@ -210,17 +210,6 @@ The repository strictly uses `snake_case` filenames (e.g., `sfo_model.py`) to en
 
 -   **Utilities:** `ai_pirep.py` (Text-to-Speech reporting) and `live_telemetry.py` (Cross-platform sensor integration).
 
-Installation
----------------
-
-Ensure you have the required dependencies installed:
-
-Bash
-
-```
-pip install -r requirements.txt
-
-```
 
 Professional & Academic Dedication
 -------------------------------------
