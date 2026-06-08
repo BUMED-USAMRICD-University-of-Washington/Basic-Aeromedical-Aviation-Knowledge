@@ -7,6 +7,8 @@ shared_cache = DynamicMemoryCache(percentage=0.25)
 import multiprocessing as mp
 import telemetry_link
 import datetime
+from telemetry_link import time_manager
+now = time_manager.get_now()
 # --- PRIMARY ENGINE: Space Weather & Kinematics ---
 import os
 import struct
