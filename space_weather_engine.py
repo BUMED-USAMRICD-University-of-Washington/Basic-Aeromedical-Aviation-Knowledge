@@ -1,14 +1,19 @@
 import telemetry_link
+import multiprocessing as mp
 # memory_manager.py AFTER telemetry per OSHA!
 # Create one shared cache instance for the whole app
 shared_cache = DynamicMemoryCache(percentage=0.25)
 from dynamic_memory_cache import DynamicMemoryCache
 from telemetry_link import time_manager
-
-import multiprocessing as mp
-import telemetry_link
-from telemetry_link import time_manager
 now = time_manager.get_now()
+
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
 # --- PRIMARY ENGINE: Space Weather & Kinematics ---
 import os
 import struct
