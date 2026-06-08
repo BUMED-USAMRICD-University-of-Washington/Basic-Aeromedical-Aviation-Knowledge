@@ -113,10 +113,10 @@ def run_fog_layer(telemetry_override=None):
     payload = {
         "initial_temp_c": temp,
         "initial_dew_c": dew,
-        "final_temp_c": round(final_t, 2),
-        "temperature_drop_c": round(drop_c, 2),
-        "final_liquid_water_path_g_m2": round(final_lwp, 2),
-        "fog_formation_hour": round(fog_hour, 2) if fog_hour is not None else None,
+        "final_temp_c": round(final_t, 15),
+        "temperature_drop_c": round(drop_c, 15),
+        "final_liquid_water_path_g_m2": round(final_lwp, 15),
+        "fog_formation_hour": round(fog_hour, 15) if fog_hour is not None else None,
         "fog_risk_active": bool(fog_hour is not None)
     }
     # 4. Push to Global Pipeline
