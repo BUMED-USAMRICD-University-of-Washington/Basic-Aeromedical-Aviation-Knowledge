@@ -4,6 +4,13 @@ import time
 import numpy as np
 from numba import njit
 
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("🚀 NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
 class NorthropGrummanExporter:
     """
     Serializes telemetry into Open Mission Systems (OMS) compliant 
