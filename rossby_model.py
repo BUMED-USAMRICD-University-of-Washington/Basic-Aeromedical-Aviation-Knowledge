@@ -1,3 +1,15 @@
+# rossby_model.py (Header Update)
+import math
+
+try:
+    import cupy as xp
+    HAS_GPU = True
+    print("🚀 NVIDIA CUDA Cores Engaged: Array Batching Active")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+    print("⚡ CPU Fallback: Standard Vectorization Active")
+
 # --- PRIMARY ENGINE: Rossby Wave Dynamics ---
 import multiprocessing as mp
 import numpy as np # Fallback to standard CPU math
