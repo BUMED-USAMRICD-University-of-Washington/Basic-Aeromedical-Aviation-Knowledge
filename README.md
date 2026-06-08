@@ -61,7 +61,7 @@ Bash
 
 ### Install Dependencies:
 
-    Ensure you have Python 3.9+ installed, then run:
+Ensure you have Python 3.9+ installed, then run:
 
 Bash
 
