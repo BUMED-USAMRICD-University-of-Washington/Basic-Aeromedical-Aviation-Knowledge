@@ -11,3 +11,5 @@ psutil
 pandas
 streamlit
 shapely
+h5py          # For multi-dimensional HDF5 scientific data
+struct        # For binary CCSDS-style packet packing (built-in)
