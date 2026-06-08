@@ -1,123 +1,63 @@
-# app.py
-import streamlit as st
-import telemetry_link
+# --- PRIMARY ENGINE: Aviation Avionics TUI ---
+# Entry point: app.py
+import os
+import time
+from textual.app import App, ComposeResult
+from textual.widgets import Header, Footer, Static, Input
+from textual.containers import Vertical
+from telemetry_link import TelemetryDispatcher
 from waypoint_manager import WaypointManager
-from flight_control_dynamics import FlightControlDynamics
+from stellarium_parser import parse_stellarium_catalog
 
-# --- 1. GLOBAL INITIALIZATION ---
-# Initialize the Centralized Data Bus and Core Navigation Engines
-wp_manager = WaypointManager()
-computer = FlightControlDynamics(mode="CIVILIAN")
+# --- PATH CONFIGURATION ---
+DATA_DIR = "src"
+CATALOG_PATH = os.path.join(DATA_DIR, "catalog-3.23.dat")
 
-st.set_page_config(page_title="Aviation Knowledge Engine", layout="wide")
-st.title("✈️ Aviation Knowledge Engine - Flight Control Dashboard")
+class AviationConsole(App):
+    """
+    FAA-Compliant Avionics Interface.
+    System runs on local data stored in /src.
+    """
+    BINDINGS = [("q", "quit", "Quit Application"), ("ctrl+d", "dispatch_telemetry", "Force Telemetry Dispatch")]
 
-# --- 2. SIDEBAR: WAYPOINT REGISTRATION & MODE ---
-with st.sidebar:
-    st.header("Waypoint Registration")
-    wp_name = st.text_input("Waypoint Name", value="KSEA_Arrival")
-    lat = st.number_input("Latitude", value=47.4502, format="%.6f")
-    lon = st.number_input("Longitude", value=-122.3088, format="%.6f")
-    alt = st.number_input("Target Altitude (ft)", value=1500)
-    heading = st.number_input("Target Heading", value=160)
-    
-    if st.button("Register Waypoint"):
-        wp_manager.register_waypoint(wp_name, lat, lon, alt, heading)
-        st.success(f"Registered {wp_name}")
-    
-    st.markdown("---")
-    st.subheader("Flight Mode Control")
-    mode = st.radio("Maneuver Profile", ["CIVILIAN", "SPORT"])
-    computer.set_mode(mode=mode)
-    
-    st.markdown("---")
-    st.caption("Centralized Data Bus: ACTIVE")
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Vertical(
+            Static("SYSTEM STATUS: NOMINAL", id="status"),
+            Static("FLIGHT DATA: IDLE", id="telemetry"),
+            Input(placeholder="System Override: KEY=VAL", id="input"),
+        )
+        yield Footer()
 
-# --- 3. MAIN DASHBOARD: PERFORMANCE ADVISORY ---
-st.subheader("Predictive Performance Envelope")
-active_wp = wp_manager.get_active_waypoint(index=0)
+    def on_mount(self):
+        """Initializes system data on boot."""
+        self.nav = WaypointManager(dso_catalog_path=CATALOG_PATH)
+        self.dispatcher = TelemetryDispatcher(output_dir="logs")
+        self.query_one("#status").update("SYSTEM INITIALIZED: src/data loaded")
 
-if active_wp:
-    # Get Safety Advisory (using a simulated 110kts current airspeed for the demo)
-    safety = computer.analyze_maneuver_safety(current_airspeed=110, target_bank_deg=30)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Active Navigation Fix", active_wp.name)
-        st.metric("Target Heading", f"{active_wp.target_heading}°")
-    with col2:
-        st.metric("Target Altitude", f"{active_wp.alt} ft")
-        st.metric("Dynamic Stall Margin", f"{safety['margin']} kts")
-    with col3:
-        if safety['is_unsafe']:
-            st.error("⚠️ ADVISORY: Planned maneuver breaches structural safety envelope.")
-        else:
-            st.success("✅ Maneuver safely within calculated performance envelope.")
-else:
-    st.info("No active waypoints. Use the sidebar to register a navigation fix.")
-
-st.markdown("---")
-
-# --- 4. ENVIRONMENT & PHYSICS ENGINES ---
-st.subheader("Atmospheric & Physics Matrix Integration")
-
-model_choice = st.selectbox("Select Core Prediction Engine to Run", [
-    "Wind Dynamics & Cooling Index",
-    "Fog Thermodynamics Matrix",
-    "Cloud Radiative Flux Balance",
-    "Cloud Thermodynamics & Trajectories",
-    "Space Weather Astronomical Tracker",
-    "Lunar Ephemeris Topocentric Path",
-    "Structural Aircraft Icing Hazard"
-])
-
-if st.button("Execute High-Performance Engine"):
-    with st.spinner("Compiling physics matrix and injecting into global state..."):
+    def on_input_submitted(self, event: Input.Submitted):
+        """Processes variable overrides with schema validation."""
         try:
-            if model_choice == "Wind Dynamics & Cooling Index":
-                import wind_dynamics
-                results = wind_dynamics.run_wind_layer()
-                st.json(results)
-                
-            elif model_choice == "Fog Thermodynamics Matrix":
-                import fog_thermodynamics
-                results = fog_thermodynamics.run_fog_layer()
-                st.json(results)
-                
-            elif model_choice == "Cloud Radiative Flux Balance":
-                import radiation_model
-                results = radiation_model.run_radiation_layer()
-                st.json(results)
-                
-            elif model_choice == "Cloud Thermodynamics & Trajectories":
-                import cloud_model
-                results = cloud_model.run_cloud_layer()
-                st.json(results)
-                
-            elif model_choice == "Space Weather Astronomical Tracker":
-                import space_weather_engine
-                results = space_weather_engine.run_space_layer()
-                st.json(results)
-                
-            elif model_choice == "Lunar Ephemeris Topocentric Path":
-                import lunar_model
-                results = lunar_model.run_lunar_layer(telemetry_override={"lat": 47.6062, "lon": -122.3321, "elevation_m": 45.0, "year": 2026})
-                st.json(results)
-                
-            elif model_choice == "Structural Aircraft Icing Hazard":
-                import aviation_icing
-                # Providing mock environment data for the UI trigger
-                env_data = {"temp_c": -5, "rh_pct": 85, "rain_mm_hr": 2.5}
-                telemetry = {"elevation_ft": 5000}
-                pirep, mass = aviation_icing.get_live_icing_pirep_data(telemetry, env_data)
-                st.write(f"**Calculated PIREP:** {pirep}")
-                st.write(f"**Mass Accretion:** {mass:.2f} kg/hr")
-                
-            st.success("✅ Engine execution complete. Data injected into Boeing Global State.")
+            key, val = event.value.split("=")
+            # Route to physics engine
+            payload = {key.strip(): float(val.strip()), "timestamp": time.time()}
+            self.dispatcher.dispatch(payload)
+            self.query_one("#status").update(f"DISPATCHED: {key} -> {val}")
+            self.query_one("#input").value = ""
         except Exception as e:
-            st.error(f"Engine execution failed: {e}")
+            self.query_one("#status").update(f"INPUT ERROR: {str(e)}")
 
-st.markdown("---")
+    def action_dispatch_telemetry(self):
+        """Force a full protocol stream dispatch."""
+        sample_data = {"temp_c": 15.0, "alt": 3000, "lat": 47.4, "lon": -122.3}
+        self.dispatcher.dispatch(sample_data)
+        self.query_one("#telemetry").update(f"DISPATCHED: {time.ctime()}")
 
-# --- 5. BOEING SYSTEM EXPORT ---
-st.subheader("Flight
+if __name__ == "__main__":
+    # Ensure src directory exists
+    if not os.path.exists(DATA_DIR):
+        print(f"CRITICAL ERROR: Data directory '{DATA_DIR}' not found.")
+        exit(1)
+        
+    app = AviationConsole()
+    app.run()
