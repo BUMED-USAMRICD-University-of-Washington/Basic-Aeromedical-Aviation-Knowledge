@@ -5,12 +5,18 @@ import math
 import pandas as pd
 from numba import njit
 
+# Astropy for high-precision frame transformations and Earth rotation
+from astropy.coordinates import EarthLocation, GCRS
+from astropy.time import Time, TimeDelta
+import astropy.units as u
+
 try:
     import cupy as np  # Attempt to use GPU-accelerated array math
     print("🚀 NVIDIA GPU Acceleration Engaged (Waypoint Manager)")
 except ImportError:
     import numpy as np # Fallback to standard CPU math
     print("⚡ Using CPU (NVIDIA acceleration not detected)")
+
 
 # =====================================================================
 # TERRESTRIAL AVIATION CLASSES
@@ -28,6 +34,7 @@ class Waypoint:
     def to_dict(self):
         return self.__dict__
 
+
 # =====================================================================
 # MULTI-DOMAIN WAYPOINT MANAGER
 # =====================================================================
@@ -35,6 +42,7 @@ class WaypointManager:
     def __init__(self, config_path="config.json", dso_catalog_path="dso_processed_metrics.csv"):
         # 1. Terrestrial Avionics State
         self.config_path = config_path
+        self.config_data = {}
         self.waypoints = []
         
         # 2. Space/Kinematic State
@@ -47,10 +55,21 @@ class WaypointManager:
         self.space_mode_enabled = False 
         
         # Initialize Boot Sequence
+        self.load_config()
         self.load_waypoints()
         self._load_space_catalog()
 
-    # --- SAFETY TOGGLES ---
+    # --- INITIALIZATION & SAFETY TOGGLES ---
+    def load_config(self):
+        """Loads the master configuration file to access sensor registries."""
+        if os.path.exists(self.config_path):
+            with open(self.config_path, "r") as f:
+                self.config_data = json.load(f)
+                
+            # Check if space mode was persisted in avionics state
+            avionics = self.config_data.get("avionics_state", {})
+            self.space_mode_enabled = avionics.get("space_routing_mode_enabled", False)
+
     def set_space_routing_mode(self, state: bool):
         """
         Manually enables or disables the deep space routing computer.
@@ -74,16 +93,13 @@ class WaypointManager:
 
     def save_waypoints(self):
         """Persists terrestrial waypoints to config.json"""
-        data = {"waypoints": [wp.to_dict() for wp in self.waypoints]}
+        self.config_data["waypoints"] = [wp.to_dict() for wp in self.waypoints]
         with open(self.config_path, "w") as f:
-            json.dump(data, f, indent=4)
+            json.dump(self.config_data, f, indent=4)
 
     def load_waypoints(self):
         """Loads terrestrial waypoints from config.json"""
-        if os.path.exists(self.config_path):
-            with open(self.config_path, "r") as f:
-                data = json.load(f)
-                self.waypoints = [Waypoint(**wp) for wp in data.get("waypoints", [])]
+        self.waypoints = [Waypoint(**wp) for wp in self.config_data.get("waypoints", [])]
 
     def get_active_waypoint(self, index=0):
         if index < len(self.waypoints):
@@ -96,6 +112,14 @@ class WaypointManager:
         if os.path.exists(self.dso_catalog_path):
             self.dso_database = pd.read_csv(self.dso_catalog_path)
             print(f"🛰️ Space Nav Computer online with {len(self.dso_database)} physical targets.")
+            
+            # Ensure Earth is always available in the local memory for return trips
+            if not (self.dso_database['Name'] == 'EARTH').any():
+                earth_row = pd.DataFrame([{
+                    "ID": 0, "Name": "EARTH", "Estimated_Mass_Solar": 0.000003, 
+                    "Surface_Temp_Kelvin": 288, "Light_Output_Lumens": 0, "Heat_Output_Watts": 0
+                }])
+                self.dso_database = pd.concat([earth_row, self.dso_database], ignore_index=True)
         else:
             print("⚠️ Space Nav Catalog offline. Awaiting pipeline update.")
 
@@ -104,7 +128,6 @@ class WaypointManager:
         Locks onto a specific deep sky object by ID or Name. 
         Will reject the command if space_mode_enabled is False.
         """
-        # --- SAFETY CHECK ---
         if not self.space_mode_enabled:
             return False, "ROUTING REJECTED: Space Routing Mode is DISABLED. Enable override to target celestial bodies."
 
@@ -127,8 +150,9 @@ class WaypointManager:
                 "name": target_data.get('Name', f"DSO-{target_data['ID']}"),
                 "mass_solar": target_data.get('Estimated_Mass_Solar', 0.0),
                 "heat_kelvin": target_data.get('Surface_Temp_Kelvin', 0.0),
-                "position_vec": np.array([1.5e11, 0.0, 0.0]), # Example initial JNow pos
-                "velocity_vec": np.array([25000.0, -5000.0, 1200.0]) # Example JNow drift
+                # If target is Earth, lock to center (0,0,0) as origin. Otherwise, simulate drift.
+                "position_vec": np.array([0.0, 0.0, 0.0]) if target_data.get('Name') == 'EARTH' else np.array([1.5e11, 0.0, 0.0]), 
+                "velocity_vec": np.array([0.0, 0.0, 0.0]) if target_data.get('Name') == 'EARTH' else np.array([25000.0, -5000.0, 1200.0])
             }
             
             print(f"🎯 SPACE TARGET LOCKED: {self.active_space_target['name']}")
@@ -137,7 +161,16 @@ class WaypointManager:
         except Exception as e:
             return False, f"Locking error: {str(e)}"
 
-    def calculate_space_interception_route(self, ship_position, ship_velocity):
+    def get_departure_state(self, current_lat, current_alt_m, current_heading, current_speed_m_s):
+        """
+        Maps terrestrial GPS speed/location to Earth's absolute space velocity 
+        to calculate the initial escape vector.
+        """
+        EARTH_ORBITAL_VELOCITY = np.array([30000.0, 0.0, 0.0]) # Simplified base vector
+        absolute_ship_velocity = EARTH_ORBITAL_VELOCITY + current_speed_m_s
+        return absolute_ship_velocity
+
+    def calculate_space_interception_route(self, ship_position_m, ship_velocity_m_s):
         """
         Calculates the kinematic intercept vectors to the moving target.
         Returns the required heading vector, closing speed, and Time To Intercept (TTI).
@@ -148,8 +181,8 @@ class WaypointManager:
         if not self.active_space_target:
             return None, "No active space target locked."
 
-        p_ship = np.array(ship_position)
-        v_ship = np.array(ship_velocity)
+        p_ship = np.array(ship_position_m)
+        v_ship = np.array(ship_velocity_m_s)
         
         p_target = self.active_space_target["position_vec"]
         v_target = self.active_space_target["velocity_vec"]
@@ -187,30 +220,33 @@ class WaypointManager:
             displacement = self.active_space_target["velocity_vec"] * dt_seconds
             self.active_space_target["position_vec"] += displacement
 
+    # --- ATMOSPHERIC RE-ENTRY (The Handshake) ---
+    def calculate_reentry_vector(self, ship_position_m, closing_velocity_m_s, target_airport_icao):
+        """
+        Calculates the exact 3D space vector required to intercept a specific 
+        airport on Earth, accounting for planetary rotation during the approach.
+        """
+        airport_data = self.config_data.get("nws_sensor_registry", {}).get(target_airport_icao)
+        if not airport_data:
+            return None, f"Airport {target_airport_icao} not found in registry."
 
-# =====================================================================
-# EXECUTION BLOCK (Demonstrating the Safety Interlock)
-# =====================================================================
-if __name__ == "__main__":
-    nav = WaypointManager()
-    
-    print("\n--- 1. Testing Atmospheric Routing ---")
-    nav.register_waypoint("KSEA_APPROACH", 47.4480, -122.3088, 3000, 180)
-    active_wp = nav.get_active_waypoint(0)
-    print(f"Flying to: {active_wp.name} at {active_wp.alt} ft.")
-    
-    print("\n--- 2. Pilot Accidentally Selects a Galaxy ---")
-    success, msg = nav.lock_space_target("Andromeda")
-    if not success:
-        print(msg)  # This will print the safety rejection message!
+        lat = airport_data["latitude"]
+        lon = airport_data["longitude"]
+        alt_m = airport_data["elevation_ft"] * 0.3048 # Convert ft to meters
+
+        EARTH_RADIUS_M = 6371000.0
+        ATMOSPHERE_BOUNDARY_M = 100000.0 # 100km Karman Line
         
-    print("\n--- 3. Activating Orbital Capable Craft ---")
-    nav.set_space_routing_mode(True)
-    
-    success, msg = nav.lock_space_target("Andromeda")
-    if success:
-        # We simulate the ship moving fast enough to catch it
-        route = nav.calculate_space_interception_route([0,0,0], [85000.0, 0, 0])
-        print(f"Target Distance: {route['distance_meters']:.2e} m")
-        print(f"Closing Speed:   {route['closing_velocity_m_s']:.2f} m/s")
-        print(f"TTI:             {route['time_to_intercept_sec']:.2f} s")
+        distance_to_core = np.linalg.norm(ship_position_m)
+        distance_to_atmo = distance_to_core - (EARTH_RADIUS_M + ATMOSPHERE_BOUNDARY_M)
+
+        if distance_to_atmo <= 0:
+            return None, "Ship is already inside the atmosphere. Switch to Terrestrial Waypoints."
+
+        if closing_velocity_m_s <= 0:
+            return None, "Ship is moving away from Earth. Cannot calculate re-entry."
+
+        # Project Time Forward based on closing velocity
+        tti_seconds = distance_to_atmo / closing_velocity_m_s
+        current_time = Time.now()
+        arrival_time = current_time
