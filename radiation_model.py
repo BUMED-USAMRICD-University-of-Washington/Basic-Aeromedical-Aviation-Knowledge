@@ -94,9 +94,9 @@ def run_radiation_layer(telemetry_override=None):
     )
     
     payload = {
-        "shortwave_net_flux_w_m2": round(sw_net, 2),
-        "longwave_net_flux_w_m2": round(lw_net, 2),
-        "total_net_flux_w_m2": round(total_net, 2),
+        "shortwave_net_flux_w_m2": round(sw_net, 15),
+        "longwave_net_flux_w_m2": round(lw_net, 15),
+        "total_net_flux_w_m2": round(total_net, 15),
         "cooling_regime_active": bool(total_net < 0.0), 
         "solar_zenith_deg": zenith,
         "cloud_fraction": c_frac
