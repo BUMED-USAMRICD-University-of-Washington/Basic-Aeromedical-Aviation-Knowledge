@@ -1,10 +1,9 @@
 import telemetry_link
 # memory_manager.py AFTER telemetry per OSHA!
-from telemetry_link import time_manager
-from dynamic_memory_cache import DynamicMemoryCache
-
 # Create one shared cache instance for the whole app
 shared_cache = DynamicMemoryCache(percentage=0.25)
+from dynamic_memory_cache import DynamicMemoryCache
+from telemetry_link import time_manager
 
 import multiprocessing as mp
 import telemetry_link
