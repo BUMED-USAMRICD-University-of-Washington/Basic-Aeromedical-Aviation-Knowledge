@@ -11,6 +11,7 @@ import math
 import numpy as np
 import pandas as pd
 import logging
+import numba
 from numba import njit
 @njit(fastmath=True)
 from pydantic import BaseModel, Field, ValidationError
