@@ -148,55 +148,120 @@ def evaluate_bellman_resolution(rel_x, rel_y, rel_vx, rel_vy, rel_h, rel_vh):
     return "✅ PATH CLEAR: Normal Trajectory Operations"
 
 # --- STAGE 4: MAIN RUNTIME STREAM CONTEXT ---
+# --- REVISED STAGE 4: MAIN RUNTIME STREAM CONTEXT WITH ONSHIP FILTERING ---
 if not adsb_api_key:
     str.warning("Please enter your ADS-B Exchange API Key in the sidebar to run live tracking.")
 else:
-    # Simulated Live Telemetry Container
     placeholder = str.empty()
     tracker = IMMKalmanFilter(dt=1.0)
     
-    # Synthetic / Placeholder tracking coordinates simulating an un-throttled feed
-    sim_t = 0
+    # Infinite tracking loop matching the 1-second ADS-B refresh interval
     while True:
-        sim_t += 1
+        # 1. Fetch live multi-aircraft JSON payload from ADS-B Exchange
+        # (This endpoint polls all traffic inside your sliding boundary ring)
+        url = f"https://adsbexchange.com{ownship_icao}/radius/{scan_radius_nm}"
+        headers = {"api-auth": adsb_api_key}
         
-        # Real Architecture Hook: 
-        # url = f"https://adsbexchange.com{ownship_icao}/radius/{scan_radius_nm}"
-        # headers = {"api-auth": adsb_api_key}
-        # data = requests.get(url, headers=headers).json()
-        
-        # Simulating a high-speed parallel runway blunder scenario
-        intruder_raw_x = 1200 - (sim_t * 55)   # Slicing inward horizontally
-        intruder_raw_y = 400 - (sim_t * 5)
-        intruder_raw_h = 3000 * FT_TO_METERS - (sim_t * 2.1 * FT_TO_METERS) # Descending jump
-        
-        # Injecting random quantization and sensor noise
-        z_meas = np.array([[intruder_raw_x + np.random.normal(0, 15)],
-                           [intruder_raw_y + np.random.normal(0, 15)],
-                           [intruder_raw_h + np.random.normal(0, 4)]])
-        
-        # Push through sensor noise filters
-        smoothed_state = tracker.predict_and_update(z_meas, omega=0.03)
-        
-        # Extract relative state geometries (Assuming ownship holds stationary baseline)
-        s_x, s_y, s_vx, s_vy, s_h, s_vh = smoothed_state.flatten()
-        
-        tau_val = calculate_modified_tau(s_x, s_y, s_vx, s_vy)
-        resolution = evaluate_bellman_resolution(s_x, s_y, s_vx, s_vy, s_h, s_vh)
-        
-        # Render Flight Deck Matrix Displays
-        with placeholder.container():
-            col1, col2, col3 = str.columns(3)
-            col1.metric("Smoothed Slant Range", f"{np.sqrt(s_x**2 + s_y**2):.1f} meters")
-            col2.metric("Modified Tau Domain", f"{tau_val:.1f} seconds" if tau_val != float('inf') else "Safe")
-            col3.metric("Filtered Vert Rate (h_dot)", f"{s_vh / FT_TO_METERS * 60:.1f} ft/min")
+        try:
+            # --- TESTING/SIMULATION ENGINE ---
+            # Un-comment the lines below to run live API calls once your key is activated:
+            # response = requests.get(url, headers=headers)
+            # data = response.json()
+            # ac_list = data.get("ac", [])
             
-            # Print Alert Outputs and Model Confidence Indexes
-            if "EMERGENCY" in resolution or "ADVISORY" in resolution:
-                str.error(resolution)
+            # Simulated API Payload representing exactly what ADS-B Exchange returns
+            ac_list = [
+                {
+                    "hex": ownship_icao.lower(),  # Your aircraft is captured in the scan radius
+                    "lat": 47.6062, "lon": -122.3321, "alt_baro": 5000, 
+                    "gs": 120, "track": 360, "baro_rate": 0
+                },
+                {
+                    "hex": "b4c5d6",  # External Threat Aircraft
+                    "lat": 47.6065, "lon": -122.3321, "alt_baro": 4980, 
+                    "gs": 180, "track": 180, "baro_rate": -150
+                }
+            ]
+            # ---------------------------------
+
+            # 2. STEP ONE: Isolate and extract YOUR live telemetry to establish the baseline
+            ownship_data = None
+            for ac in ac_list:
+                # Direct string-matching check across the hardcoded 24-bit Mode S addresses
+                if ac.get("hex", "").strip().lower() == ownship_icao.strip().lower():
+                    ownship_data = ac
+                    break
+            
+            if ownship_data is None:
+                str.sidebar.error(f"Aircraft Hex {ownship_icao} not found in the current tracking radius.")
+                # Fallback baseline coordinates if your transponder is blocked or obscured
+                own_x, own_y, own_h = 0.0, 0.0, 5000 * FT_TO_METERS
+                own_vx, own_vy, own_vh = 0.0, 0.0, 0.0
             else:
-                str.success(resolution)
+                # Convert your live GPS and speed metrics into meters and meters/second
+                own_h = ownship_data.get("alt_baro", 0) * FT_TO_METERS
+                own_vh = ownship_data.get("baro_rate", 0) * (FT_TO_METERS / 60.0)
                 
-            str.text(f"IMM Confidence Metrics -> Straight Flight Model (CV): {tracker.mu[0]*100:.1f}% | Bank Turning Model (CT): {tracker.mu[1]*100:.1f}%")
+                # Convert Groundspeed (Knots) and Track (Degrees) to 2D Cartesian Velocity Vectors
+                gs_mps = ownship_data.get("gs", 0) * 0.514444  # 1 knot = 0.514 m/s
+                track_rad = np.radians(ownship_data.get("track", 0))
+                own_vx = gs_mps * np.sin(track_rad)
+                own_vy = gs_mps * np.cos(track_rad)
+                
+                # Establish internal 0,0 datum grid using your live coordinates
+                own_x, own_y = 0.0, 0.0 
+
+            # 3. STEP TWO: Loop through intruders while strictly EXCLUDING your own hex
+            for intruder in ac_list:
+                intruder_hex = intruder.get("hex", "").strip().lower()
+                
+                # THE FILTER: Skip processing entirely if the data packet belongs to you
+                if intruder_hex == ownship_icao.strip().lower():
+                    continue  # Safely avoids self-collision false alarms
+                
+                # --- Execute Advanced Mathematical Telemetry Loops on remaining targets ---
+                # Convert intruder coordinates to relative metrics from your moving baseline
+                int_h = intruder.get("alt_baro", 0) * FT_TO_METERS
+                int_vh = intruder.get("baro_rate", 0) * (FT_TO_METERS / 60.0)
+                int_gs_mps = intruder.get("gs", 0) * 0.514444
+                int_track_rad = np.radians(intruder.get("track", 0))
+                int_vx = int_gs_mps * np.sin(int_track_rad)
+                int_vy = int_gs_mps * np.cos(int_track_rad)
+                
+                # Simplified tracking transformation (Meters from Ownship Datum)
+                # In full build, apply Haversine/Great-Circle conversions from Lat/Lon to Delta Meters
+                rel_raw_x = 500.0   # Sample offset
+                rel_raw_y = 200.0   
+                rel_raw_h = int_h - own_h
+                
+                # Vector Delta Subtraction: Relative Velocities
+                rel_vx_delta = int_vx - own_vx
+                rel_vy_delta = int_vy - own_vy
+                rel_vh_delta = int_vh - own_vh
+                
+                # Push through IMM Kalman Filter to strip sensor quantization noise
+                z_meas = np.array([[rel_raw_x], [rel_raw_y], [rel_raw_h]])
+                smoothed_state = tracker.predict_and_update(z_meas, omega=0.01)
+                s_x, s_y, _, _, s_h, _ = smoothed_state.flatten()
+                
+                # Calculate True Hazard Metrics
+                tau_val = calculate_modified_tau(s_x, s_y, rel_vx_delta, rel_vy_delta)
+                resolution = evaluate_bellman_resolution(s_x, s_y, rel_vx_delta, rel_vy_delta, s_h, rel_vh_delta)
+                
+                # 4. Render UI Output Container
+                with placeholder.container():
+                    str.subheader(f"Monitoring Airspace: Target [Hex: {intruder_hex.upper()}]")
+                    col1, col2, col3 = str.columns(3)
+                    col1.metric("Relative Separation", f"{np.sqrt(s_x**2 + s_y**2):.1f} meters")
+                    col2.metric("Time-to-Impact (Tau)", f"{tau_val:.1f} sec" if tau_val != float('inf') else "Safe")
+                    col3.metric("Relative Climb Gradient", f"{rel_vh_delta / FT_TO_METERS * 60:.1f} ft/min")
+                    
+                    if "EMERGENCY" in resolution or "ADVISORY" in resolution:
+                        str.error(resolution)
+                    else:
+                        str.success(resolution)
+                        
+        except Exception as e:
+            str.error(f"Data stream handling error: {e}")
             
         time.sleep(1.0)
