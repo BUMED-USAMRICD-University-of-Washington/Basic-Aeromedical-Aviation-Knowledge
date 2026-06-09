@@ -2,23 +2,18 @@ import h5py
 import struct
 import numpy as np
 import time
-
 class NASATelemetryExporter:
     """
     Serializes standard aviation telemetry into NASA-compliant 
     binary (CCSDS-emulation) and hierarchical (HDF5) formats.
     """
-    
-    # CCSDS Binary Packet structure: [Sync Word][Packet ID][Timestamp][Data]
     PACKET_FORMAT = ">HHd12f" # Sync(2), ID(2), Time(8), 12 Floats(48) = 60 bytes
     SYNC_WORD = 0xEB90
-
     @staticmethod
     def to_nasa_binary_packet(telemetry_dict):
         """
         Converts JSON-style telemetry into a compact 60-byte binary packet.
         """
-        # Map telemetry to a flat float list for binary transport
         data = [
             telemetry_dict.get('temp_c', 0.0),
             telemetry_dict.get('pressure_hpa', 0.0),
@@ -28,7 +23,6 @@ class NASATelemetryExporter:
             # Pad with 0s if payload is smaller than expected
             *[0.0]*7 
         ]
-        
         packet_id = 0x0001
         timestamp = time.time()
         
@@ -39,7 +33,6 @@ class NASATelemetryExporter:
             timestamp,
             *data
         )
-
     @staticmethod
     def save_hdf5_instrument_data(filename, dataset_name, array_data):
         """
@@ -53,21 +46,11 @@ class NASATelemetryExporter:
             dset = f.create_dataset(dataset_name, data=array_data, compression="gzip")
             dset.attrs['units'] = 'SI'
             dset.attrs['timestamp'] = time.time()
-            print(f"✅ Instrumented data saved to {filename} [{dataset_name}]")
-
-# ==========================================
-# Integration: Usage in your flight loop
-# ==========================================
+            print(f"Instrumented data saved to {filename} [{dataset_name}]")
 if __name__ == "__main__":
     exporter = NASATelemetryExporter()
-    
-    # 1. Simulating a telemetry payload from your flight_control_dynamics
     payload = {"temp_c": 15.5, "pressure_hpa": 1013.2, "lat": 47.4, "lon": -122.3, "alt": 3000.0}
-    
-    # 2. Export as High-Speed Binary Packet
     binary_packet = exporter.to_nasa_binary_packet(payload)
     print(f"📦 NASA Binary Packet Size: {len(binary_packet)} bytes")
-    
-    # 3. Export as HDF5 for instrument grids
     mock_sensor_grid = np.random.rand(100, 100) # 100x100 weather grid
     exporter.save_hdf5_instrument_data("mission_data.h5", "weather_grid_v1", mock_sensor_grid)
