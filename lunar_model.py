@@ -1,4 +1,5 @@
-# --- PRIMARY ENGINE: Lunar Tracking Model ---
+import astropy.coordinates as coord
+import astropy.units as u
 import multiprocessing as mp
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,11 +7,7 @@ import telemetry_link
 from telemetry_link import time_manager
 import datetime
 now = time_manager.get_now()
-import astropy.coordinates as coord
-import astropy.units as u
 from astropy.time import Time
-
-# --- SECONDARY ENGINE DEPENDENCIES ---
 import telemetry_link          # NEW: Integrated Centralized Data Bus
 import aviation_physics        # Core math
 import aviation_telemetry      # Data flow
