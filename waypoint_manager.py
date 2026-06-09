@@ -11,12 +11,12 @@ from atmospheric_entry_controller import AtmosphericEntryController
 # --- 1. CONFIGURATION SCHEMA ---
 
 class VehicleSpecs(BaseModel):
-    def check_takeoff_sequence(self, current_pos, velocity, thrust_level):
     vehicle_mass: float = Field(gt=0)
     wing_area: float = Field(gt=0)
     cd0: float = Field(gt=0)
     induced_drag_k: float = Field(gt=0)
     nose_radius: float = Field(gt=0)
+    def check_takeoff_sequence(self, current_pos, velocity, thrust_level):
     # PHASE 1 & 2: Holding at WP1
     if self.current_waypoint == "WP1":
         if thrust_level < MAX_THRUST:
