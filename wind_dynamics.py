@@ -6,6 +6,7 @@ except ImportError:
     HAS_GPU = False
 import pandas as pd
 import matplotlib.pyplot as plt
+import numba
 from numba import njit
 @njit(fastmath=True)
 import telemetry_link
