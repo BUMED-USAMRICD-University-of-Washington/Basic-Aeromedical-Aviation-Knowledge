@@ -1,4 +1,16 @@
-import psutil # Ensure this is installed via pip
+import numba
+from numba import njit
+import multiprocessing as mp
+@njit(fastmath=True)
+try:
+    import cupy as xp
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+    print("CPU Fallback: Standard Vectorization Active (Performance)")
+import psutil
 import sys
 from collections import OrderedDict
 def preallocate_buffer(size_mb):
