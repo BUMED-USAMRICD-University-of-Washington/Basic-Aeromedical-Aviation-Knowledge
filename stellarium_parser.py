@@ -3,6 +3,11 @@ import aviation_telemetry
 import aircraft_perf
 import sensor_thermodynamics
 import os
+try:
+    import cupy as np
+    print("NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np
 import struct
 import pandas as pd
 def parse_stellarium_catalog(file_path):
@@ -20,8 +25,8 @@ def parse_stellarium_catalog(file_path):
             print("Detected text-based catalog format. Parsing as TSV...")
             df = pd.read_csv(
                 file_path, 
-                sep='\t',          # Tab separated
-                comment='#',       # Ignore header comments
+                sep='\t',
+                comment='#',
                 low_memory=False,
                 names=["ID", "RA", "Dec", "Type", "Morph_Type", "Mag", "Size_Arcmin", "Orientation", "Name"]
             )
@@ -43,11 +48,11 @@ def parse_stellarium_catalog(file_path):
                 unpacked_data = struct.unpack('<iffffi', record)
                 obj_dict = {
                     "ID": unpacked_data[0],
-                    "RA": unpacked_data[1],        # Right Ascension
-                    "Dec": unpacked_data[2],       # Declination
-                    "Mag": unpacked_data[3],       # Visual Magnitude
-                    "Size_Arcmin": unpacked_data[4], # Angular size
-                    "Type": unpacked_data[5]       # Object type code
+                    "RA": unpacked_data[1],
+                    "Dec": unpacked_data[2],
+                    "Mag": unpacked_data[3],
+                    "Size_Arcmin": unpacked_data[4],
+                    "Type": unpacked_data[5]
                 }
                 objects.append(obj_dict)
             except struct.error:
@@ -55,7 +60,7 @@ def parse_stellarium_catalog(file_path):
     df = pd.DataFrame(objects)
     print(f"Successfully unpacked {len(df)} binary records.")
     return df
-    import aerodynamic_matrix      # Lift/Drag logic
+    import aerodynamic_matrix
 if __name__ == "__main__":
     catalog_path = "catalog-3.23.dat" 
     try:
