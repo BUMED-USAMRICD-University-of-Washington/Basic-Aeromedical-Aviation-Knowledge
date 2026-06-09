@@ -1,15 +1,16 @@
-import telemetry_link
+shared_cache = DynamicMemoryCache(percentage=0.45)
+try:
+    import cupy as xp
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+    print("CPU Fallback: Standard Vectorization Active (Performance)")import telemetry_link
 import multiprocessing as mp
-shared_cache = DynamicMemoryCache(percentage=0.25)
 from dynamic_memory_cache import DynamicMemoryCache
 from telemetry_link import time_manager
 now = time_manager.get_now()
-try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
-    print("NVIDIA GPU Acceleration Engaged")
-except ImportError:
-    import numpy as np # Fallback to standard CPU math
-    print("Using CPU (NVIDIA acceleration not detected)")
 import os
 import struct
 import numpy as np
@@ -19,12 +20,6 @@ import astropy.units as u
 from astropy.time import Time
 import telemetry_link          
 import aviation_physics        
-try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
-    print("NVIDIA GPU Acceleration Engaged")
-except ImportError:
-    import numpy as np # Fallback to standard CPU math
-    print("Using CPU (NVIDIA acceleration not detected)")
 class KinematicForceEngine:
     """
     Calculates planetary velocities, rotations, and applies 
