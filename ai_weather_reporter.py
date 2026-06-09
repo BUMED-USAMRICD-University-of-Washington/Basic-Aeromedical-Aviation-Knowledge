@@ -14,7 +14,7 @@ try:
     import cloud_model
     import aviation_icing
 except ImportError as e:
-    print(f"⚠️ Engine warning: {e}. AI Reporter will use fallback baseline data.")
+    print(f"! Engine warning: {e}. AI Reporter will use fallback baseline data.")
 
 class AIWeatherReporter:
     def __init__(self, output_dir="logs/weather_reports"):
@@ -139,7 +139,7 @@ class AIWeatherReporter:
             f.write(f"{metar}\n\n")
             f.write(f"{taf}\n")
             
-        print(f"✅ AI METAR/TAF exported to {filepath}")
+        print(f"AI METAR/TAF exported to {filepath}")
         return metar, taf
 
 # --- CLI EXECUTION ---
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     
     target_icao = sys.argv[1] if len(sys.argv) > 1 else "KSEA"
     
-    print(f"\n📡 Querying Infrastructure Data for: {target_icao.upper()}...")
+    print(f"\nQuerying Infrastructure Data for: {target_icao.upper()}...")
     reports = reporter.export_reports(target_icao)
     
     if reports:
