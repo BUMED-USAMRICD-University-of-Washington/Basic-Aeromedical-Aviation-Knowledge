@@ -18,12 +18,8 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
+import numba
 from numba import njit
-try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
-    print("NVIDIA GPU Acceleration Engaged")
-except ImportError:
-    print("Using CPU (NVIDIA acceleration not detected)")
 @njit(fastmath=True)
 def calculate_rossby_grid_kinematics(latitude_array_deg, zonal_wind_array_m_s, wave_number=4):
     """
