@@ -1,8 +1,8 @@
 try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
+    import cupy as np
     print("NVIDIA GPU Acceleration Engaged")
 except ImportError:
-    import numpy as np # Fallback to standard CPU math
+    import numpy as np
     print("Using CPU (NVIDIA acceleration not detected)")
 import datetime
 class TimeManager:
