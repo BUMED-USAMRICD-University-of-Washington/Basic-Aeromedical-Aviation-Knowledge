@@ -1,3 +1,4 @@
+from dynamic_memory_cache import DynamicMemoryCache
 shared_cache = DynamicMemoryCache(percentage=0.45)
 try:
     import cupy as xp
@@ -8,7 +9,6 @@ except ImportError:
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")import telemetry_link
 import multiprocessing as mp
-from dynamic_memory_cache import DynamicMemoryCache
 from telemetry_link import time_manager
 now = time_manager.get_now()
 import os
