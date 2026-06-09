@@ -2,7 +2,7 @@ import os
 try:
     import cupy as xp
     HAS_GPU = True
-    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+    print("NVidia CUDA Cores Engaged: Array Batching Active (Performance)")
 except ImportError:
     import numpy as xp
     HAS_GPU = False
