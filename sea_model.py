@@ -1,4 +1,9 @@
 import numpy as np
+try:
+    import cupy as np
+    print("NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
