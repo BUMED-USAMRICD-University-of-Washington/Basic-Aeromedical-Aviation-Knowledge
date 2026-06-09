@@ -1,9 +1,17 @@
-import numpy as np
+import numba
+try:
+    import cupy as xp
+    HAS_GPU = True
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
 import multiprocessing as mp
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import astropy.coordinates as coord
+from numba import njit
+@njit(fastmath=True)
 import astropy.units as u
 from astropy.time import Time
 import csv
