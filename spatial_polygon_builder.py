@@ -1,27 +1,26 @@
 import numpy as np
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
+import multiprocessing as mp
+@njit(fastmath=True)
 import pandas as pd
 from dynamic_memory_cache import DynamicMemoryCache
-shared_cache = DynamicMemoryCache(percentage=0.25)
+shared_cache = DynamicMemoryCache(percentage=0.50)
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon, Point
-import aviation_physics        # Core math
-import telemetry_link
-import aviation_telemetry      # Data flow
-import aircraft_perf           # Performance calculations
-import sensor_thermodynamics   # Env data scaling
-import aerodynamic_matrix      # Lift/Drag logic
-import streamlit as st
+import aviation_physics
 import multiprocessing as mp
+import telemetry_link
+import aviation_telemetry
+import aircraft_perf
+import sensor_thermodynamics
+import aerodynamic_matrix
+import streamlit as st
 try:
-    import cupy as xp  # NVIDIA GPU Acceleration
+    import cupy as xp
     HAS_GPU = True
-    print("NVIDIA CUDA Cores Engaged: Spatial Ray-Casting Active")
 except ImportError:
-    import numpy as xp # CPU Fallback
+    import numpy as xp
     HAS_GPU = False
-    print("CPU Fallback: Standard Vectorized Spatial Check Active")
 def build_radar_boundary_arrays(filepath):
     """
     Reads the exported ExpertGPS text file and extracts the vertices.
@@ -90,11 +89,11 @@ if __name__ == "__main__":
     simulated_radar_lats = [40.0, 42.0, 42.0, 40.0]
     simulated_radar_lons = [-112.0, -112.0, -110.0, -110.0]
     test_sensors = [
-        {"id": "SENSOR_1", "lat": 41.0, "lon": -111.5},  # Dead Center (Inside)
-        {"id": "SENSOR_2", "lat": 39.0, "lon": -111.5},  # Too far South (Outside)
-        {"id": "SENSOR_3", "lat": 41.5, "lon": -113.0},  # Too far West (Outside)
-        {"id": "SENSOR_4", "lat": 41.9, "lon": -110.1},  # Barely Inside
-        {"id": "SENSOR_5", "lat": 45.0, "lon": -100.0}   # Way Outside
+        {"id": "SENSOR_1", "lat": 41.0, "lon": -111.5},
+        {"id": "SENSOR_2", "lat": 39.0, "lon": -111.5},
+        {"id": "SENSOR_3", "lat": 41.5, "lon": -113.0},
+        {"id": "SENSOR_4", "lat": 41.9, "lon": -110.1},
+        {"id": "SENSOR_5", "lat": 45.0, "lon": -100.0}
     ]
     test_lats = [s["lat"] for s in test_sensors]
     test_lons = [s["lon"] for s in test_sensors]
