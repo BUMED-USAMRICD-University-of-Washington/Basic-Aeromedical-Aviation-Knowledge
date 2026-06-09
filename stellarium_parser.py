@@ -1,5 +1,7 @@
 import aviation_physics
 import aviation_telemetry
+import telemetry_link
+from telemetry_link import time_manager
 import aircraft_perf
 import sensor_thermodynamics
 import os
