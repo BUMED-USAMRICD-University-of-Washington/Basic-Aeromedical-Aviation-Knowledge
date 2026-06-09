@@ -1,5 +1,5 @@
-import astropy.units as u
 import astropy.coordinates as coord
+import astropy.units as u
 from astropy.time import Time
 now = time_manager.get_now()
 import datetime
