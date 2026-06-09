@@ -1,24 +1,22 @@
-# memory_manager.py
 from dynamic_memory_cache import DynamicMemoryCache
-# Create one shared cache instance for the whole app
 shared_cache = DynamicMemoryCache(percentage=0.25)
 import multiprocessing as mp
-# --- PRIMARY ENGINE: Galactic Telemetry & FAA Flight Logging ---
 import os
-import json
 from datetime import datetime
 import pandas as pd
-import numpy as np
-# Astropy for high-precision frame transformations
+import numba
 from astropy.coordinates import EarthLocation, ITRS, GCRS, Galactocentric, CartesianRepresentation
 from astropy.time import Time
 import astropy.units as u
 try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
+    import cupy as np
     print("NVIDIA GPU Acceleration Engaged")
 except ImportError:
-    import numpy as np # Fallback to standard CPU math
+    import numpy as np
     print("Using CPU (NVIDIA acceleration not detected)")
+from numba import njit
+@njit(fastmath=True)
+import json
 class GalacticFlightTracker:
     """
     Translates standard terrestrial GPS/Avionics telemetry into 
@@ -28,7 +26,6 @@ class GalacticFlightTracker:
     def __init__(self, log_file="faa_galactic_flight_log.json"):
         self.log_file = log_file
         self.flight_data = []   
-        # Load existing log if appending to an ongoing flight
         if os.path.exists(self.log_file):
             try:
                 with open(self.log_file, "r") as f:
@@ -40,36 +37,24 @@ class GalacticFlightTracker:
         Takes a terrestrial GPS ping, converts it to deep space coordinates,
         and appends it to the master flight log.
         """
-        # 1. Capture exact epoch
         current_time = Time.now()
-        # 2. Define Earth Location (WGS84 Ellipsoid standard for GPS)
-        # Using exact elevation to ensure Z-axis accuracy in space
         aircraft_loc = EarthLocation.from_geodetic(
             lat=lat_deg * u.deg, 
             lon=lon_deg * u.deg, 
             height=alt_meters * u.m
         )
-        # 3. Transform to ITRS (International Terrestrial Reference System)
-        # This gives us X, Y, Z from the center of the Earth, rotating with the Earth.
         itrs_pos = ITRS(
             x=aircraft_loc.x, 
             y=aircraft_loc.y, 
             z=aircraft_loc.z, 
             obstime=current_time
         )
-        # 4. Transform to GCRS (Geocentric Celestial Reference System)
-        # This detaches the coordinate from Earth's rotation, fixing it to the stars.
-        gcrs_pos = itrs_pos.transform_to(GCRS(obstime=current_time))      
-        # 5. Transform to Galactocentric
-        # Origin (0,0,0) is Sagittarius A*. 
+        gcrs_pos = itrs_pos.transform_to(GCRS(obstime=current_time))
         galactocentric_pos = gcrs_pos.transform_to(Galactocentric())
-        # Extract the XYZ vectors in Parsecs and Meters
         x_pc = galactocentric_pos.x.to(u.pc).value
         y_pc = galactocentric_pos.y.to(u.pc).value
-        z_pc = galactocentric_pos.z.to(u.pc).value       
-        # 1 Parsec is approx 3.086e+16 meters
+        z_pc = galactocentric_pos.z.to(u.pc).value
         pc_to_m = 3.08567758128e16
-        # Compile FAA / Space Command Telemetry Payload
         telemetry_frame = {
             "timestamp_utc": current_time.iso,
             "callsign": callsign,
@@ -117,17 +102,12 @@ class GalacticFlightTracker:
         df.to_csv(csv_filename, index=False)
         print(f"Exported 3D Flight Path to {csv_filename}")
         return True
-# ==========================================
-# Execution Block: Flight Logging Test
-# ==========================================
 if __name__ == "__main__":
     print("================================================================")
     print("          GALACTIC TELEMETRY & FLIGHT TRACKING ENGINE           ")
     print("================================================================")
-    # Initialize the tracker
     tracker = GalacticFlightTracker()
     print("\n[SYSTEM] Simulating initial terrestrial departure sequence...")
-    # Frame 1: Ground Level 
     frame_1 = tracker.log_waypoint(
         callsign="VesselArrest-1",
         lat_deg=47.4480,    
@@ -136,7 +116,6 @@ if __name__ == "__main__":
         heading=180.0,
         speed_knots=150.0
     )
-    # Frame 2: Ascending (Simulating exactly 1 minute later, moving south, climbing)
     frame_2 = tracker.log_waypoint(
         callsign="VesselArrest-1",
         lat_deg=47.3480,    
