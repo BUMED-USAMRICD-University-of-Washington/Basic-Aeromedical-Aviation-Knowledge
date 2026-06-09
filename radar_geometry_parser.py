@@ -1,17 +1,25 @@
+import numba
 from dynamic_memory_cache import DynamicMemoryCache
 shared_cache = DynamicMemoryCache(percentage=0.5)
+try:
+    import cupy as xp
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
 import io
 import streamlit as st
 import numpy as np
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
+@njit(fastmath=True)
 import pandas as pd
 import matplotlib.pyplot as plt
-import aviation_physics        # Core math
-import aviation_telemetry      # Data flow
-import aircraft_perf           # Performance calculations
-import sensor_thermodynamics   # Env data scaling
-import aerodynamic_matrix      # Lift/Drag logic
+import aircraft_perf
+import aviation_telemetry
+import sensor_thermodynamics
+import aerodynamic_matrix
+import aviation_physics
 def load_volumetric_radar_data(telemetry_override=None, raw_text_data):
     """
     Parses the raw attribute table containing radar beam heights and trackpoints.
