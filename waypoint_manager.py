@@ -42,7 +42,35 @@ class VehicleSpecs(BaseModel):
             return f"EXECUTE_TACTICAL_ROTATION_LIMIT_{alpha_max}"
 
 class WaypointManager:
+def generate_circular_pattern(self, center_lat, center_lon, radius_nm, waypoint_count=36):
+    """
+    Generates a high-fidelity circular orbit (The Big Circle).
+    Uses Guard Clauses (No-Else) for structural integrity.
+    """
+    # Guard: Validate radius
+    if radius_nm <= 0:
+        return []
+
+    # Initialize path array
+    path = []
     
+    # Calculate angles
+    theta = np.linspace(0, 2 * np.pi, waypoint_count, endpoint=False)
+    
+    # Generate circular coordinates
+    for angle in theta:
+        # Simple spherical approximation (1 NM ≈ 1/60 degrees)
+        lat_offset = (radius_nm / 60.0) * np.cos(angle)
+        lon_offset = (radius_nm / 60.0) * np.sin(angle)
+        
+        path.append({
+            "lat": center_lat + lat_offset,
+            "lon": center_lon + lon_offset,
+            "alt": self.current_flight_level,
+            "type": "HOLDING_POINT"
+        })
+        
+    return path
 def export_planned_trajectory(self, current_pos, current_vel, time_horizon_s=60, dt=1.0):
         """
         Projects the current intercept vector forward in time for intent analysis.
