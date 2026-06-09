@@ -1,7 +1,16 @@
-import os
+try:
+    import cupy as xp
+    HAS_GPU = True
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+import multiprocessing as mp
 import psutil
-import torch # If utilizing CUDA for matrix math
+import os
+import torch
 import numba
+from numba import njit
+@njit(fastmath=True)
 def crank_performance():
     """Forces CPU affinity and GPU max-clock settings."""
     proc = psutil.Process()
