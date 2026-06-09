@@ -16,7 +16,10 @@ class VehicleSpecs(BaseModel):
     cd0: float = Field(gt=0)
     induced_drag_k: float = Field(gt=0)
     nose_radius: float = Field(gt=0)
-    def check_takeoff_sequence(self, current_pos, velocity, thrust_level):
+    
+class WaypointManager:
+    
+def check_takeoff_sequence(self, current_pos, velocity, thrust_level):
     # PHASE 1 & 2: Holding at WP1
     if self.current_waypoint == "WP1":
         if thrust_level < MAX_THRUST:
@@ -41,9 +44,6 @@ class VehicleSpecs(BaseModel):
             alpha_max = calculate_dynamic_tail_strike_limit(...)
             return f"EXECUTE_TACTICAL_ROTATION_LIMIT_{alpha_max}"
             
-
-
-class WaypointManager:
 def export_planned_trajectory(self, current_pos, current_vel, time_horizon_s=60, dt=1.0):
         """
         Projects the current intercept vector forward in time for intent analysis.
