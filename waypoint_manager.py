@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 import logging
 @njit(fastmath=True)
-import json
 from pydantic import BaseModel, Field, ValidationError
+import json
 from atmospheric_entry_controller import AtmosphericEntryController
 class VehicleSpecs(BaseModel):
     vehicle_mass: float = Field(gt=0)
