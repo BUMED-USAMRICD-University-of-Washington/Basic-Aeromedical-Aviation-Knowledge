@@ -1,3 +1,6 @@
+import numba
+from dynamic_memory_cache import DynamicMemoryCache
+shared_cache = DynamicMemoryCache(percentage=0.05)
 from pydantic import BaseModel, Field, validator
 from typing import Dict
 class VehicleConfig(BaseModel):
@@ -30,6 +33,14 @@ class PlanetaryProfile(BaseModel):
     g0: float = Field(gt=0)
     rho0: float = Field(ge=0) # Can be 0 for space
     H: float = Field(gt=0)
+try:
+    import cupy as xp
+    HAS_GPU = True
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+from numba import njit
+@njit(fastmath=True)
 def validate_configuration(config_data: Dict):
     """
     Parses and validates configuration maps.
