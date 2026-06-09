@@ -1,3 +1,6 @@
+import numba
+from numba import njit
+@njit(fastmath=True)
 try:
     import cupy as np
     print("NVIDIA GPU Acceleration Engaged")
