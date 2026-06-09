@@ -1,9 +1,11 @@
+import multiprocessing as mp
 import numpy as np
 try:
-    import cupy as np
-    print("NVIDIA GPU Acceleration Engaged")
+    import cupy as xp
+    HAS_GPU = True
+    print("NVidia CUDA Cores Engaged: Array Batching Active (Performance)")
 except ImportError:
-    import numpy as np
+    HAS_GPU = False
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
@@ -12,6 +14,9 @@ shared_cache = DynamicMemoryCache(percentage=0.25)
 import aviation_physics
 import aviation_telemetry
 import aircraft_perf
+import numba
+from numba import njit
+@njit(fastmath=True)
 import sensor_thermodynamics
 import aerodynamic_matrix
 def run_sea_layer(telemetry_override=None):
