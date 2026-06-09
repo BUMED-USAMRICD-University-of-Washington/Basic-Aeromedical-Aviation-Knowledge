@@ -62,7 +62,7 @@ def parse_stellarium_catalog(file_path):
     return df
     import aerodynamic_matrix
 from dynamic_memory_cache import DynamicMemoryCache
-shared_cache = DynamicMemoryCache(percentage=0.15)
+shared_cache = DynamicMemoryCache(percentage=0.17)
 if __name__ == "__main__":
     catalog_path = "catalog-3.23.dat" 
     try:
