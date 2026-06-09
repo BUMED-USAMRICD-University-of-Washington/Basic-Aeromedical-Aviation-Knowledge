@@ -1,5 +1,15 @@
 # app.py
 import typer
+from control_bridge.performance_bridge import crank_performance
+
+if __name__ == "__main__":
+    # STAGE 1: CRANK THE HARDWARE
+    # This must happen before any math kernels are imported
+    crank_performance() 
+    
+    # STAGE 2: INITIALIZE FLIGHT SYSTEM
+    logging.basicConfig(filename="flight_system.log", level=logging.ERROR)
+    app()
 import logging
 import time
 import os
