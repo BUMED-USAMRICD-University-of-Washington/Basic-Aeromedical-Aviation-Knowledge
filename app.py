@@ -61,7 +61,7 @@ def master_boot_sequence():
     from waypoint_manager import WaypointManager
     from flight_control_dynamics import FlightControlDynamics
     
-    logger.info("SYSTEM READY: Flight systems anchored.")
+    logger.info("SYSTEM READY: Flight systems ready for taxi, flight, & landing. CERTIFIED PILOT(S) MUST OPERATE LANDING GEAR AND TOE BRAKES.")
 
 # In your main execution block:
 if __name__ == "__main__":
