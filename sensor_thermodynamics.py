@@ -1,16 +1,23 @@
 import aviation_physics
-import numpy as np
 import multiprocessing as mp
+import numpy as np
+try:
+    import cupy as xp
+    HAS_GPU = True
+    print("NVidia CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+import numba
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
-import streamlit as st
+@njit(fastmath=True)
 import pandas as pd
 import matplotlib.pyplot as plt
-import aviation_telemetry
 import aircraft_perf
+import aviation_telemetry
 import sensor_thermodynamics
-import aerodynamic_matrix
 import streamlit as st
+import aerodynamic_matrix
 try:
     import cupy as np
     print("NVIDIA GPU Acceleration Engaged")
