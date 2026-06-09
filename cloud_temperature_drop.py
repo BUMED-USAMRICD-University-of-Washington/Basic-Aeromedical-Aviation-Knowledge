@@ -1,4 +1,3 @@
-# --- PRIMARY ENGINE: Cloud Radiative Cooling ---
 import numpy as np
 import pandas as pd
 import telemetry_link
@@ -6,26 +5,21 @@ import datetime
 from telemetry_link import time_manager
 now = time_manager.get_now()
 import matplotlib.pyplot as plt
-
-# --- SECONDARY ENGINE DEPENDENCIES ---
-import telemetry_link          # NEW: Integrated Centralized Data Bus
-import aviation_physics        # Core math
-import aviation_telemetry      # Data flow
-import aircraft_perf           # Performance calculations
-import sensor_thermodynamics   # Env data scaling
-import aerodynamic_matrix      # Lift/Drag logic
+import telemetry_link
+import aviation_physics
+import aviation_telemetry
+import aircraft_perf
+import sensor_thermodynamics
+import aerodynamic_matrix
 import streamlit as st
-# --- HARDWARE ABSTRACTION LAYER (HAL) ---
-
 try:
-    import cupy as xp  # NVIDIA GPU Acceleration
+    import cupy as xp
     HAS_GPU = True
-    print("🚀 NVIDIA CUDA Cores Engaged: Array Batching Active (Cloud Temp)")
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
 except ImportError:
-    import numpy as xp # CPU Fallback
+    import numpy as xp
     HAS_GPU = False
-    print("⚡ CPU Fallback: Standard Vectorization Active (Cloud Temp)")
-    
+    print("CPU Fallback: Standard Vectorization Active (Performance)")
 def calculate_radiative_cooling_grid(
     lwp_array_g_m2, t_start_c_array, cloud_fraction_array, hours=12.0
 ):
@@ -33,30 +27,16 @@ def calculate_radiative_cooling_grid(
     Batched calculation of net temperature drop due to radiative cooling.
     Processes entire grid arrays simultaneously.
     """
-    # 1. Load data to hardware (15-Decimal Precision Standard)
     lwp = xp.array(lwp_array_g_m2, dtype=xp.float64)
     t_start = xp.array(t_start_c_array, dtype=xp.float64)
     c_frac = xp.array(cloud_fraction_array, dtype=xp.float64)
-    
-    # 2. Thermodynamic Constants (15-Decimal Precision)
     SIGMA = 5.670374419000000e-8
     SPECIFIC_HEAT_AIR = 1005.0 # J/(kg*K)
-    
-    # 3. Radiative Flux (Batched Math)
-    # Cooling rate proportional to cloud emissivity and surface temperature
     emissivity = 1.0 - xp.exp(-0.022 * lwp)
-    # Stefan-Boltzmann flux approximation for cloud deck
     net_flux = emissivity * SIGMA * ((t_start + 273.15) ** 4) * c_frac
-    
-    # 4. Energy Balance Integration (12-hour window = 43,200 seconds)
     total_seconds = hours * 3600.0
-    # temp_drop = (flux * time) / (heat_capacity * mass_layer)
-    # Assuming standard atmospheric column density 
     temp_drop = (net_flux * total_seconds) / (SPECIFIC_HEAT_AIR * 1000.0)
-    
     final_temp = t_start - temp_drop
-
-    # 5. Return to CPU host
     if HAS_GPU:
         return {
             "drop_c": xp.round(temp_drop, 15).get().tolist(),
@@ -73,12 +53,9 @@ def calculate_radiative_cooling_grid(
 def run_cloud_temp_layer(telemetry_override=None):
     """Main orchestration function reporting to Boeing payload."""
     print("☁️ Running Batched Cloud Radiative Cooling Layer...")
-    
-    # Default scalar lists
     lwps = [50.0]
     temps = [15.0]
     fractions = [0.8]
-    
     if telemetry_override:
         if isinstance(telemetry_override, dict):
             lwps = [telemetry_override.get('lwp', 50.0)]
@@ -88,9 +65,7 @@ def run_cloud_temp_layer(telemetry_override=None):
             lwps = [t.get('lwp', 50.0) for t in telemetry_override]
             temps = [t.get('temp_c', 15.0) for t in telemetry_override]
             fractions = [t.get('cloud_fraction', 0.8) for t in telemetry_override]
-
     results = calculate_radiative_cooling_grid(lwps, temps, fractions)
-    
     payload = {
         "initial_temp_c": temps[0],
         "liquid_water_path_g_m2": lwps[0],
@@ -98,22 +73,16 @@ def run_cloud_temp_layer(telemetry_override=None):
         "total_temperature_drop_c": results['drop_c'][0],
         "downwelling_longwave_flux_w_m2": results['net_flux'][0]
     }
-    
     telemetry_link.update_global_state("atmospheric_models", "cloud_cooling", payload)
-    print(f"✅ Cloud layer cooling grid reported to global state.")
+    print(f"Cloud layer cooling grid reported to global state.")
     return payload
-
 if __name__ == "__main__":
     print("=================================================================")
     print("          CLOUD RADIATIVE COOLING ENGINE (BATCHED)               ")
     print("=================================================================")
-    
-    # Test batching with 3 sectors: [Marine Stratus, Cumulus, High Cirrus]
     test_lwp = [100.0, 50.0, 5.0]
     test_temps = [15.0, 10.0, -20.0]
     test_frac = [0.9, 0.4, 0.1]
-    
     results = calculate_radiative_cooling_grid(test_lwp, test_temps, test_frac)
-    
     for i in range(3):
         print(f"Sector {i+1}: Start: {test_temps[i]}°C -> End: {round(results['final_t'][i], 2)}°C")
