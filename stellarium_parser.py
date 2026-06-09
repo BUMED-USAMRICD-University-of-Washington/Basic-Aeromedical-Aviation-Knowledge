@@ -1,3 +1,6 @@
+from numba import njit
+import multiprocessing as mp
+@njit(fastmath=True)
 import aviation_physics
 import aviation_telemetry
 import telemetry_link
