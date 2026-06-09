@@ -49,7 +49,6 @@ def calculate_radiative_cooling_grid(
             "final_t": xp.round(final_temp, 15).tolist(),
             "net_flux": xp.round(net_flux, 15).tolist()
         }
-
 def run_cloud_temp_layer(telemetry_override=None):
     """Main orchestration function reporting to Boeing payload."""
     print("☁️ Running Batched Cloud Radiative Cooling Layer...")
