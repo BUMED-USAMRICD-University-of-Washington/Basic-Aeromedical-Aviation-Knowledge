@@ -1,5 +1,16 @@
-import json
+import numba
+from numba import njit
 import time
+@njit(fastmath=True)
+try:
+    import cupy as xp
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+    print("CPU Fallback: Standard Vectorization Active (Performance)")
+import json
 class OAAMTelemetryExporter:
     """
     Exports system topology for Plug & Fly discovery.
