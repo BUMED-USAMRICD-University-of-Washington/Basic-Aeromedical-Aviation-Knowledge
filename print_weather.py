@@ -1,5 +1,11 @@
 import socket
 from datetime import datetime
+try:
+    import cupy as np  # Attempt to use GPU-accelerated array math
+    print("NVIDIA GPU Acceleration Engaged")
+except ImportError:
+    import numpy as np # Fallback to standard CPU math
+    print("Using CPU (NVIDIA acceleration not detected)")
 def format_aviation_printout(icao_station, metar_data, taf_data, pireps):
     """
     Formats raw weather text data into a structured, easily readable slip.
@@ -15,7 +21,6 @@ def format_aviation_printout(icao_station, metar_data, taf_data, pireps):
     print_job.append("\n[CURRENT METAR]")
     print_job.append(metar_data)
     print_job.append("\n[WEATHER PREDICTIONS / TAF]")
-
     for line in taf_data.split('\n'):
         print_job.append(line)
     print_job.append("\n[PILOT REPORTS / PIREPS]")
