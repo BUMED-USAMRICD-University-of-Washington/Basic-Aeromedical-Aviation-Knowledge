@@ -3,6 +3,8 @@ import typer
 import logging
 import time
 import os
+import numpy as np  # Added for state vectors
+
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Input, RichLog, Checkbox
 from textual.containers import Vertical, Horizontal
@@ -17,6 +19,10 @@ import aviation_physics
 import rossby_model
 import fog_thermodynamics
 import radiation_model
+
+# --- NEW ENGINE INTEGRATIONS ---
+from intent_engine import IntentEngine
+from collision_avoidance_app import CollisionMonitor
 
 # --- SAFETY WRAPPER: MISSION CRITICAL ---
 def avionics_safety_wrapper(func):
@@ -35,18 +41,24 @@ class AviationConsole(App):
     Screen { align: center middle; }
     #control-panel { width: 30%; height: 100%; border: solid green; }
     #log-panel { width: 70%; height: 100%; border: solid white; }
+    .collision-alert { border: solid red; color: red; text-style: bold; }
     """
     
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("d", "dispatch_telemetry", "Dispatch Global Telemetry"),
-        ("m", "run_master_physics", "Run Boeing Master Sequence")
+        ("m", "run_master_physics", "Run Boeing Master Sequence"),
+        ("s", "scan_trajectory", "Scan for Collisions")  # New Radar Binding
     ]
 
     def __init__(self, mode: str, target: str):
         super().__init__()
         self.mode = mode
         self.target = target
+        
+        # State Vectors for Intent Engine Integration
+        self.current_pos = np.array([6371000.0, 0.0, 0.0]) # Earth surface baseline
+        self.current_vel = np.array([7500.0, 0.0, 0.0])    # Orbital velocity baseline
 
     def compose(self) -> ComposeResult:
         """Merged compose method to prevent overwrite bug and apply CSS."""
@@ -57,6 +69,7 @@ class AviationConsole(App):
                 Checkbox("Enable S-Turn Energy Management", id="s-turn-toggle"),
                 Input(placeholder="Override: KEY=VAL", id="input"),
                 Static("Status: NOMINAL", id="status"),
+                Static("COLLISION RADAR: STANDBY", id="radar-status"), # New Radar UI
                 id="control-panel"  # Matches CSS target
             ),
             RichLog(id="log-panel", highlight=True),
@@ -72,7 +85,12 @@ class AviationConsole(App):
             self.nav = WaypointManager()
             self.computer = FlightControlDynamics(mode=self.mode)
             self.dispatcher = GlobalDispatcher(output_dir="logs")
-            self.logger.write("SUCCESS: Avionics Engines Linked.")
+            
+            # Initialize Collision & Intent Engines
+            self.intent = IntentEngine()
+            self.collision_monitor = CollisionMonitor(catalog_path="src/catalog-3.23.dat")
+            
+            self.logger.write("SUCCESS: Avionics & Radar Engines Linked.")
         except Exception as e:
             self.logger.write(f"CRITICAL: Init Failed: {e}")
 
@@ -109,6 +127,36 @@ class AviationConsole(App):
         rossby_model.run_rossby_layer()
         radiation_model.run_radiation_layer()
         self.logger.write("SEQUENCE: Physics layers synced.")
+
+    @avionics_safety_wrapper
+    def action_scan_trajectory(self):
+        """Executes the Intent -> Collision radar scan pipeline."""
+        self.logger.write(">>> INITIATING TRAJECTORY INTENT SCAN...")
+        
+        # 1. Ask WaypointManager where it intends to go
+        planned_path = self.nav.export_planned_trajectory(self.current_pos, self.current_vel)
+        
+        if not planned_path:
+            self.logger.write("Radar: No active target path to scan.")
+            return
+
+        # 2. Refine path with IntentEngine 
+        refined_intent = self.intent.calculate_maneuver_envelope(planned_path)
+        
+        # 3. Check against cataloged objects
+        collision_risk = self.collision_monitor.evaluate_risk(refined_intent)
+        
+        status_widget = self.query_one("#radar-status")
+        
+        if collision_risk['imminent']:
+            self.logger.write(f"!!! COLLISION WARNING: Object {collision_risk['object_id']} at T-{collision_risk['time_to_impact']}s !!!")
+            status_widget.update("RADAR: COLLISION IMMINENT")
+            status_widget.add_class("collision-alert")
+        else:
+            self.logger.write("Radar: Trajectory Clear.")
+            status_widget.update("RADAR: CLEAR")
+            status_widget.remove_class("collision-alert")
+
 
 # --- TYPER CLI ENTRY POINT ---
 app = typer.Typer()
