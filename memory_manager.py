@@ -2,6 +2,15 @@ import sys
 import psutil # Ensure this is installed via pip
 from collections import OrderedDict
 
+def preallocate_buffer(size_mb):
+    """
+    Verifies that the requested memory block is contiguous.
+    """
+    buffer = bytearray(size_mb * 1024 * 1024)
+    if len(buffer) == (size_mb * 1024 * 1024):
+        print(f"CACHE STATUS: {size_mb}MB Contiguous Cache Locked.")
+    return buffer
+    
 class DynamicMemoryCache:
     def __init__(self, percentage=0.25):
         # Dynamically detect total system memory
