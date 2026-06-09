@@ -1,5 +1,5 @@
-import sys
 import psutil # Ensure this is installed via pip
+import sys
 from collections import OrderedDict
 def preallocate_buffer(size_mb):
     """
@@ -14,9 +14,9 @@ class DynamicMemoryCache:
         try:
             total_memory_bytes = psutil.virtual_memory().total
             self.max_size_bytes = int(total_memory_bytes * percentage)
-            print(f"✅ Cache initialized: {self.max_size_bytes / (1024**3):.2f} GB allocated.")
+            print(f"Cache initialized: {self.max_size_bytes / (1024**3):.2f} GB allocated.")
         except Exception as e:
-            print(f"⚠️ Could not detect RAM, defaulting to 1GB: {e}")
+            print(f"Could not detect RAM, defaulting to 1GB: {e}")
             self.max_size_bytes = 1 * 1024 * 1024 * 1024
         self.cache = OrderedDict()
         self.current_size = 0
