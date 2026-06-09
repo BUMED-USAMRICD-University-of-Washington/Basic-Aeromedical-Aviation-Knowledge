@@ -8,6 +8,7 @@ except ImportError:
     import numpy as xp
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")
+import numba
 from numba import njit
 @njit(fastmath=True)
 import matplotlib.pyplot as plt
