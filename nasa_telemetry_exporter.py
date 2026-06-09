@@ -1,7 +1,11 @@
+import multiprocessing as mp
+import numba
 import h5py
 import struct
-import numpy as np
+from numba import njit
+@njit(fastmath=True)
 import time
+import numpy as np
 class NASATelemetryExporter:
     """
     Serializes standard aviation telemetry into NASA-compliant 
