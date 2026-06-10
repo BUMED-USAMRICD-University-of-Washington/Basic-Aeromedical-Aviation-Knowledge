@@ -1,153 +1,209 @@
 import multiprocessing as mp
 import os
+""" waypoint_manager.py """
+""" Finite State Machine & Ground-to-Air Sequence Tracker """
+""" Optimized: Else-Less Guard Clauses | 15-Decimal Precision | Numba Kernels """
+
+import math
+import telemetry_link
+
+""" --- HARDWARE ABSTRACTION LAYER (HAL) --- """
 try:
     import cupy as xp
+    from numba import dummy_njit as njit
     HAS_GPU = True
-    print("NVidia CUDA Cores Engaged: Array Batching Active (Performance)")
+    print("NVIDIA CUDA Cores Engaged: Matrix Allocation Active (Waypoint Manager)")
 except ImportError:
     import numpy as xp
+    from numba import njit
     HAS_GPU = False
-import math
-import numpy as np
-import pandas as pd
-import logging
-import numba
-from numba import njit
+    print("CPU Fallback: Numba Vectorization Active (Waypoint Manager)")
+
+
+""" ===================================================================== """
+""" --- PURE MATH KERNELS (THE BASEMENT MATHEMATICIANS) --- """
+""" These receive @njit because they only process pure numbers and arrays """
+""" ===================================================================== """
+
 @njit(fastmath=True)
-from pydantic import BaseModel, Field, ValidationError
-import json
-from atmospheric_entry_controller import AtmosphericEntryController
-class VehicleSpecs(BaseModel):
-    vehicle_mass: float = Field(gt=0)
-    wing_area: float = Field(gt=0)
-    cd0: float = Field(gt=0)
-    induced_drag_k: float = Field(gt=0)
-    nose_radius: float = Field(gt=0)
-    def check_takeoff_sequence(self, current_pos, velocity, thrust_level):
-    if self.current_waypoint == "WP1":
-        if thrust_level < MAX_THRUST:
-            return "HOLD_BRAKES"
-        else:
+def calculate_spatial_distance(lat1, lon1, alt1, lat2, lon2, alt2):
+    """ Fast 3D Haversine-style spatial distance calculation in meters. """
+    
+    """ 1. Constant Default (Earth Radius in meters) """
+    R = 6371000.0
+    
+    """ HAPPY PATH: Spherical distance computation """
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_phi / 2.0)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0)**2
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    
+    horizontal_distance = R * c
+    vertical_distance = alt2 - alt1
+    
+    """ 3D Euclidean distance including elevation """
+    total_distance = math.sqrt(horizontal_distance**2 + vertical_distance**2)
+    return total_distance
+
+
+@njit(fastmath=True)
+def ekf_prediction_step(x_hat, u, P, Q, dt):
+    """ Non-linear State-Space EKF projection for Ground Tracking. """
+    """ State x: [x, y, V, psi, theta, q] """
+    
+    """ GUARD 1: Prevent negative or zero time skips """
+    if dt <= 0.0:
+        return x_hat, P
+
+    """ HAPPY PATH: Project state forward (Euler Integration) """
+    """ For pure math abstraction, we treat u[0] as forward acceleration, u[1] as yaw acceleration """
+    forward_accel = u[0]
+    yaw_accel = u[1]
+    
+    x_prior = xp.copy(x_hat)
+    
+    """ Update Velocity and Heading """
+    x_prior[2] = x_hat[2] + (forward_accel * dt)
+    x_prior[3] = x_hat[3] + (yaw_accel * dt)
+    
+    """ Update X/Y ground coordinates based on new velocity and heading """
+    x_prior[0] = x_hat[0] + (x_prior[2] * math.cos(x_prior[3]) * dt)
+    x_prior[1] = x_hat[1] + (x_prior[2] * math.sin(x_prior[3]) * dt)
+    
+    """ Jacobian approximation (F) for covariance projection """
+    """ Equation: P_prior = F * P * F^T + Q """
+    F = xp.eye(6)
+    F[0, 2] = math.cos(x_prior[3]) * dt
+    F[1, 2] = math.sin(x_prior[3]) * dt
+    F[0, 3] = -x_prior[2] * math.sin(x_prior[3]) * dt
+    F[1, 3] = x_prior[2] * math.cos(x_prior[3]) * dt
+    
+    P_prior = (F @ P @ F.T) + Q
+    
+    return x_prior, P_prior
+
+
+""" ===================================================================== """
+""" --- THE ORCHESTRATOR (THE MANAGER) --- """
+""" NO @njit here. This interacts with FSM classes, state, and telemetry. """
+""" ===================================================================== """
+
+class WaypointManager:
+    """ Manages the Ground FSM, Tactical Takeoff Sequence, and 3D Waypoint Routing. """
+    
+    def __init__(self):
+        """ 15-Decimal Default Thresholds """
+        self.DISTANCE_THRESHOLD_M = 15.000000000000000
+        self.V1_SPEED_KTS = 135.000000000000000
+        self.VR_SPEED_KTS = 145.000000000000000
+        self.MAX_THRUST_N = 250000.000000000000000
+        
+        self.current_waypoint = "WP1"
+        self.fsm_state = "TAXIING_MODE"
+        
+        """ EKF Tracking Memory """
+        self.P_matrix = xp.eye(6)
+        self.Q_matrix = xp.eye(6) * 0.01
+
+    def evaluate_ground_state(self, strut_pressures_psi, aerodynamic_lift_n, aircraft_weight_n):
+        """ Weight-on-Wheels (WoW) logic matrix. """
+        
+        """ GUARD 1: Lift exceeds weight (Airborne) """
+        if aerodynamic_lift_n >= aircraft_weight_n:
+            return 0
+            
+        """ GUARD 2: Strut pressure is zero/low (Gear in transit or freely hanging) """
+        pressure_sum = sum(strut_pressures_psi)
+        if pressure_sum < 1000.0:
+            return 0
+            
+        """ HAPPY PATH: Solidly on the runway surface """
+        return 1
+
+    def determine_fsm_transition(self, ground_state, ground_speed_kts, thrust_level):
+        """ Translates physical state into explicit FSM Modes. """
+        
+        """ GUARD 1: Airborne """
+        if ground_state == 0:
+            self.fsm_state = "AERIAL_FLIGHT_MODE"
+            return self.fsm_state
+
+        """ GUARD 2: Emergency Abort trigger from Telemetry Bridge """
+        bridge_state = telemetry_link.get_global_state("authority", "system_state")
+        if bridge_state == "ELSE":
+            self.fsm_state = "EMERGENCY_ABORT_MODE"
+            return self.fsm_state
+
+        """ GUARD 3: Fast Ground Roll (Takeoff Commenced) """
+        if ground_speed_kts >= 50.0 and thrust_level > (self.MAX_THRUST_N * 0.8):
+            self.fsm_state = "TAKEOFF_RUN_MODE"
+            return self.fsm_state
+            
+        """ HAPPY PATH: Standard Ground Taxi """
+        self.fsm_state = "TAXIING_MODE"
+        return self.fsm_state
+
+    def check_takeoff_sequence(self, current_pos, wp1_pos, wp2_pos, wp3_pos, velocity_kts, thrust_level):
+        """ Else-less Tactical Takeoff FSM anchored to 3 physical waypoints. """
+        
+        """ 1. Default Initialization (Fail-Safe) """
+        action = "HOLD_POSITION"
+
+        """ GUARD 1: Not on runway waypoints """
+        if self.current_waypoint not in ["WP1", "WP2", "WP3"]:
+            return action
+
+        """ GUARD 2: WP1 Static Hold Check """
+        if self.current_waypoint == "WP1":
+            if thrust_level < self.MAX_THRUST_N:
+                return "HOLD_BRAKES_SPOOL_ENGINES"
+            
+            """ Thrust is maxed, FSM advances waypoint """
             self.current_waypoint = "WP2"
             return "RELEASE_BRAKES"
-    elif self.current_waypoint == "WP2":
-        if self.distance_to(current_pos, WP2) < THRESHOLD:
-            if velocity >= V1_SPEED:
-                self.current_waypoint = "WP3"
+
+        """ GUARD 3: WP2 Acceleration & V1 Verification """
+        if self.current_waypoint == "WP2":
+            distance_to_wp2 = calculate_spatial_distance(
+                current_pos['lat'], current_pos['lon'], current_pos['alt'],
+                wp2_pos['lat'], wp2_pos['lon'], wp2_pos['alt']
+            )
+            
+            if distance_to_wp2 >= self.DISTANCE_THRESHOLD_M:
                 return "CONTINUE_ACCELERATION"
-            else:
+                
+            if velocity_kts < self.V1_SPEED_KTS:
                 return "ABORT_TAKEOFF"
-    elif self.current_waypoint == "WP3":
-        if self.distance_to(current_pos, WP3) < THRESHOLD or velocity >= VR_SPEED:
-            alpha_max = calculate_dynamic_tail_strike_limit(...)
-            return f"EXECUTE_TACTICAL_ROTATION_LIMIT_{alpha_max}"
-class WaypointManager:
-def generate_circular_pattern(self, center_lat, center_lon, radius_nm, waypoint_count=36):
-    """
-    Generates a high-fidelity circular orbit (The Big Circle).
-    Uses Guard Clauses (No-Else) for structural integrity.
-    """
-    if radius_nm <= 0:
-        return []
-    path = []
-    theta = np.linspace(0, 2 * np.pi, waypoint_count, endpoint=False)
-    for angle in theta:
-        lat_offset = (radius_nm / 60.0) * np.cos(angle)
-        lon_offset = (radius_nm / 60.0) * np.sin(angle)
-        path.append({
-            "lat": center_lat + lat_offset,
-            "lon": center_lon + lon_offset,
-            "alt": self.current_flight_level,
-            "type": "HOLDING_POINT"
-        })
-    return path
-def export_planned_trajectory(self, current_pos, current_vel, time_horizon_s=60, dt=1.0):
-        """
-        Projects the current intercept vector forward in time for intent analysis.
-        """
-        if not self.active_space_target:
-            return []
-        trajectory = []
-        for t in range(int(time_horizon_s / dt)):
-            future_pos = current_pos + (current_vel * t * dt)
-            trajectory.append({
-                "time_offset": t * dt,
-                "position": future_pos
-            })
-        return trajectory
-    def __init__(self, config_path="config.json", dso_catalog_path="src/catalog-3.23.dat"):
-        self.config_path = config_path
-        self.dso_catalog_path = dso_catalog_path
-        self.waypoints = []
-        self.active_space_target = None
-        self.s_turn_enabled = False
-    def set_s_turn_mode(self, enabled: bool):
-        """Selector toggle for the S-Turn energy management system."""
-        self.s_turn_enabled = enabled
-        logging.info(f"S-Turn Mode: {'ENABLED' if enabled else 'DISABLED'}")
-    def calculate_tactical_approach(self, ship_pos, ship_vel, target_lat, target_lon):
-        """
-        Tactical Approach Interface.
-        Uses Standard Math by default; switches to Energy Management if s_turn_enabled is True.
-        """
-        intercept = self.calculate_universal_intercept(ship_pos, ship_vel)
-        if self.s_turn_enabled:
-            v_mag = np.linalg.norm(ship_vel)
-            alt = np.linalg.norm(ship_pos) - 6371000
-            safety = self.entry_controller.evaluate_approach_safety(v=v_mag, h=alt, alpha=35.0)
-            if not safety['is_safe']:
-                return self._inject_s_turn_maneuver(intercept)
-        return intercept
-        self.config = self._load_and_validate_config()
-        self.entry_controller = AtmosphericEntryController(
-            mass=self.config.vehicle_mass,
-            S=self.config.wing_area,
-            cd0=self.config.cd0,
-            K=self.config.induced_drag_k,
-            R_p=6371000, 
-            g0=9.81
+                
+            """ V1 achieved, FSM preps for rotation """
+            self.current_waypoint = "WP3"
+            return "CONTINUE_ACCELERATION"
+
+        """ GUARD 4: WP3 Rotation Point Check """
+        distance_to_wp3 = calculate_spatial_distance(
+            current_pos['lat'], current_pos['lon'], current_pos['alt'],
+            wp3_pos['lat'], wp3_pos['lon'], wp3_pos['alt']
         )
-        self._load_space_catalog()
-    def _load_and_validate_config(self) -> VehicleSpecs:
-        """Schema validation to prevent illegal physics inputs."""
-        if not os.path.exists(self.config_path):
-            return VehicleSpecs(vehicle_mass=95000, wing_area=330, cd0=0.028, induced_drag_k=0.042, nose_radius=1.5)
-        with open(self.config_path, 'r') as f:
-            data = json.load(f)
-            return VehicleSpecs(**data.get("Starship_Class", {}))
-    def calculate_tactical_approach(self, ship_pos, ship_vel, target_lat, target_lon):
-        """
-        Calculates 3D intercept with integrated energy management.
-        If the approach is 'Too Hot', it forces an S-turn trajectory.
-        """
-        intercept = self.calculate_universal_intercept(ship_pos, ship_vel)
-        v_mag = np.linalg.norm(ship_vel)
-        alt = np.linalg.norm(ship_pos) - 6371000
-        safety = self.entry_controller.evaluate_approach_safety(v=v_mag, h=alt, alpha=35.0)
-        if not safety['is_safe']:
-            logging.warning(f"TACTICAL ALERT: Heat Flux {safety['heat_flux']:.1f} W/cm2. Energy bleed required.")
-            return self._inject_s_turn_maneuver(intercept)
-        return intercept
-    def _inject_s_turn_maneuver(self, intercept):
-        """Creates lateral bank waypoints to extend flight path without losing speed."""
-        intercept['maneuver'] = "S-TURN_ENERGY_BLEED"
-        intercept['bank_cmd'] = 45.0
-        return intercept
-    def calculate_universal_intercept(self, ship_pos, ship_vel, target_alt_m=0):
-        """Standard 3D Intercept Engine (Core Navigation)."""
-        if not self.active_space_target: return None
-        target_body_pos = self.active_space_target["position_vec"]
-        dist_to_core = np.linalg.norm(target_body_pos - np.array(ship_pos))
-        closing_vel = np.linalg.norm(ship_vel)
-        tti = (dist_to_core - self.active_space_target["radius"]) / (closing_vel + 1e-6)
-        lat_r, lon_r = math.radians(self.active_space_target["lat"]), math.radians(self.active_space_target["lon"])
-        r = self.active_space_target["radius"] + target_alt_m
-        local_vec = np.array([
-            r * math.cos(lat_r) * math.cos(lon_r),
-            r * math.cos(lat_r) * math.sin(lon_r),
-            r * math.sin(lat_r)
-        ])
-        return {"heading": (target_body_pos - np.array(ship_pos)) / dist_to_core, "tti": tti}
-    def _load_space_catalog(self):
-        if os.path.exists(self.dso_catalog_path):
-            self.dso_database = pd.read_csv(self.dso_catalog_path)
+        
+        if distance_to_wp3 >= self.DISTANCE_THRESHOLD_M and velocity_kts < self.VR_SPEED_KTS:
+            return "CONTINUE_ACCELERATION"
+
+        """ HAPPY PATH: Execute Tactical Rotation precisely at WP3 """
+        return "EXECUTE_TACTICAL_ROTATION"
+
+    def process_ground_ekf_cycle(self, x_hat, u_vector, dt):
+        """ Updates the ground tracking Extended Kalman Filter matrix. """
+        
+        """ Call the Numba JIT mathematician to process the matrices """
+        x_new, P_new = ekf_prediction_step(xp.array(x_hat), xp.array(u_vector), self.P_matrix, self.Q_matrix, float(dt))
+        
+        """ Store updated covariance back into the class state """
+        self.P_matrix = P_new
+        
+        """ Return state vector converted to 15-decimal precision list for telemetry export """
+        if HAS_GPU:
+            return xp.round(x_new, 15).get().tolist()
+        return xp.round(x_new, 15).tolist()
