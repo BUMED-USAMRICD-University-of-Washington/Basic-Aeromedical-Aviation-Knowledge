@@ -150,6 +150,42 @@ def calculate_mach_number(tas_kts, temp_c):
     speed_of_sound_kts = 38.945 * math.sqrt(temp_k)
     
     return tas_kts / speed_of_sound_kts
+
+def calculate_ground_acceleration(thrust_n, drag_n, weight_n, friction_coef):
+    """ Tactical Takeoff Roll Acceleration (dV/dt) """
+    
+    """ GUARD 1: Airborne or Invalid Weight """
+    if weight_n <= 0.0: 
+        return 0.0
+        
+    """ HAPPY PATH: dV/dt = g * ((T - D - Fr) / W) """
+    friction_force = friction_coef * weight_n
+    net_force = thrust_n - drag_n - friction_force
+    
+    """ GUARD 2: Brakes/Friction holding aircraft completely still """
+    if net_force <= 0.0: 
+        return 0.0
+        
+    acceleration_mps2 = 9.80665 * (net_force / weight_n)
+    return acceleration_mps2
+
+def calculate_tactical_climb_angle(thrust_n, drag_n, weight_n):
+    """ Steep tactical departure climb angle to clear threat rings """
+    
+    """ GUARD 1: Drag exceeds thrust, climb is physically impossible """
+    if drag_n >= thrust_n: 
+        return 0.0
+        
+    """ HAPPY PATH: gamma = arcsin((T - D) / W) """
+    excess_thrust = thrust_n - drag_n
+    
+    """ GUARD 2: Vertical climb maximum cap (T/W ratio > 1) """
+    if excess_thrust >= weight_n: 
+        return 90.0
+        
+    angle_rad = math.asin(excess_thrust / weight_n)
+    return math.degrees(angle_rad)
+    
     """ Store in memory cache before returning """
     shared_cache.add_to_cache(cache_key, final_array)
     return final_array
