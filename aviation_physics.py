@@ -83,6 +83,47 @@ def get_dynamic_pressure_grid(altitude_ft_arr, local_baro_hpa_arr, indicated_air
     if not HAS_GPU:
         final_array = xp.round(dynamic_pressure_arr, 15).tolist()
 
+def calculate_ground_effect_ratio(height_ft, wingspan_ft):
+    """ Else-less Ground Effect (Induced Drag Reduction) """
+    
+    """ GUARD 1: Prevent division by zero or invalid geometry """
+    if wingspan_ft <= 0.0:
+        return 1.0
+
+    """ GUARD 2: Aircraft is out of ground effect (typically > 1 wingspan) """
+    """ Bypasses all complex math when mid-air """
+    if height_ft >= wingspan_ft:
+        return 1.0
+
+    """ HAPPY PATH: Calculate aerodynamic reduction ratio """
+    h_b_ratio = height_ft / wingspan_ft
+    ratio = (33.0 * (h_b_ratio ** 2)) / (1.0 + 33.0 * (h_b_ratio ** 2))
+    
+    return ratio
+
+    import math
+
+def calculate_crab_angle(wind_speed_kts, wind_dir_deg, runway_heading_deg, tas_kts):
+    """ Else-less Wind Correction Angle (WCA) """
+
+    """ GUARD 1: Aircraft is stationary (Prevents division by zero) """
+    if tas_kts <= 0.0:
+        return 0.0, 0.0
+
+    """ HAPPY PATH: Calculate Crosswind Component """
+    alpha_rad = math.radians(wind_dir_deg - runway_heading_deg)
+    v_crosswind = wind_speed_kts * math.sin(alpha_rad)
+
+    """ GUARD 2: Crosswind exceeds True Airspeed """
+    """ If the wind is blowing faster than the jet can fly, it is physically impossible to crab. """
+    if tas_kts <= abs(v_crosswind):
+        return 0.0, v_crosswind
+
+    """ HAPPY PATH: Calculate Final Crab Angle (Theta) """
+    theta_rad = math.asin(v_crosswind / tas_kts)
+    theta_deg = math.degrees(theta_rad)
+
+    return theta_deg, v_crosswind
     """ Store in memory cache before returning """
     shared_cache.add_to_cache(cache_key, final_array)
     return final_array
