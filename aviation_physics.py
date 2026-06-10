@@ -185,6 +185,20 @@ def calculate_tactical_climb_angle(thrust_n, drag_n, weight_n):
         
     angle_rad = math.asin(excess_thrust / weight_n)
     return math.degrees(angle_rad)
+
+@njit(fastmath=True)
+def calculate_accelerated_stall_speed(v_s0_kts, bank_angle_deg):
+    """ Tactical Bank Accelerated Stall Limit (V_s,acc) """
+    
+    """ GUARD 1: Pure vertical bank is physically impossible to maintain level flight """
+    if bank_angle_deg >= 90.0 or bank_angle_deg <= -90.0: 
+        return 9999.0
+        
+    """ HAPPY PATH: Vs_acc = Vs0 * sqrt(1 / cos(bank)) """
+    bank_rad = math.radians(abs(bank_angle_deg))
+    load_factor = 1.0 / math.cos(bank_rad)
+    
+    return v_s0_kts * math.sqrt(load_factor)
     
     """ Store in memory cache before returning """
     shared_cache.add_to_cache(cache_key, final_array)
