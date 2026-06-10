@@ -1,7 +1,6 @@
 """ waypoint_manager.py """
 """ Multi-Domain Waypoint Manager, FSM Tracker, & Intercept Guidance """
 """ Optimized: Else-Less Guard Clauses | 15-Decimal Precision | Numba Kernels """
-
 import math
 import multiprocessing as mp
 import os
