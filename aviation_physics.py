@@ -26,14 +26,10 @@ try:
     HAS_GPU = True
     print("NVIDIA CUDA Cores Engaged: Array Batching Active (Aviation Physics)")
 except ImportError:
-    import numpy as xp
-    from numba import njit
     """ CPU JIT Compilation """
     HAS_GPU = False
     print("CPU Fallback: Numba Vectorization Active (Aviation Physics)")
 
-
-@njit(fastmath=True)
 def compute_atmospheric_density(altitude_ft, local_baro_hpa):
     """ Else-less computation of air density using the International Standard Atmosphere (ISA). """
     
