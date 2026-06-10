@@ -7,6 +7,7 @@ import math
 import os
 import json
 import telemetry_link
+from pydantic import BaseModel, Field, ValidationError
 
 """ --- HARDWARE ABSTRACTION LAYER (HAL) --- """
 try:
@@ -25,6 +26,28 @@ except ImportError:
 """ These receive @njit because they only process pure numbers and arrays """
 """ ===================================================================== """
 
+
+import json
+import os
+
+""" ===================================================================== """
+""" --- THE PYDANTIC FIREWALL (DYNAMIC INTEGRATION) --- """
+""" ===================================================================== """
+
+class VehicleSpecs(BaseModel):
+    """ 
+    Enforces strict typing and physics boundaries on incoming JSON configurations.
+    Fails instantly if external inputs send impossible physical values.
+    """
+    vehicle_mass_kg: float = Field(gt=0.0)
+    wing_area_m2: float = Field(gt=0.0)
+    cd0: float = Field(gt=0.0)
+    induced_drag_k: float = Field(gt=0.0)
+    nose_radius_m: float = Field(gt=0.0)
+    
+    """ Default fallback to standard 250kN thrust if omitted from JSON """
+    max_thrust_n: float = Field(default=250000.000000000000000, gt=0.0)
+    
 @njit(fastmath=True)
 def calculate_spatial_distance(lat1, lon1, alt1, lat2, lon2, alt2):
     """ Fast 3D Haversine-style spatial distance calculation in meters. """
