@@ -1,4 +1,3 @@
-import pandas as pd
 import matplotlib.pyplot as plt
 import telemetry_link
 import aviation_physics
