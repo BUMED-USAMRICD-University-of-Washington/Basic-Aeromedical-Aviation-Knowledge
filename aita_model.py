@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 try:
     import cupy as xp
@@ -9,18 +7,11 @@ except ImportError:
     import numpy as xp
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")
-import aviation_physics        # Core math
-import aviation_telemetry      # Data flow
-import aircraft_perf           # Performance calculations
-import sensor_thermodynamics   # Env data scaling
-import aerodynamic_matrix      # Lift/Drag logic
-try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
-    print("NVIDIA GPU Acceleration Engaged")
-except ImportError:
-    import numpy as np # Fallback to standard CPU math
-    print("Using CPU (NVIDIA acceleration not detected)")
-import streamlit as st
+import aviation_physics
+import aviation_telemetry
+import aircraft_perf
+import sensor_thermodynamics
+import aerodynamic_matrix
 def run_atl_layer(telemetry_override=None):
     st.header("Atlanta Spikes (ATL / KFFC Area) Local Temperature Tendency")
     st.markdown(r"### Equation: $\frac{\partial T}{\partial t} = -\vec{V} \cdot \nabla T + \left(\frac{\alpha}{c_p}\right)\omega + \frac{J}{c_p}$")
