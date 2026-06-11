@@ -1,7 +1,6 @@
 import math
 import matplotlib.pyplot as plt
 import numba
-import pandas as pd
 from dynamic_memory_cache import DynamicMemoryCache
 shared_cache = DynamicMemoryCache(percentage=0.04)
 from numba import njit
@@ -20,7 +19,80 @@ STEFAN_BOLTZMANN = 5.670374419e-8  # W / (m^2 * K^4)
 LUMINOSITY_SUN_W = 3.828e26        # Watts
 RADIUS_SUN_M     = 6.957e8         # Meters
 LUMINOUS_EFFICACY_SUN = 93.0       # Approximate Lumens per Watt for a G-type star
+
 @njit(fastmath=True)
+def compute_atmospheric_attenuation(flux_toa_wm2, altitude_m):
+    """Beer-Lambert Law: Calculates radiation surviving atmospheric absorption."""
+    
+    """Guard 1: Above the Karman line (100km), no atmosphere to block radiation"""
+    if altitude_m >= 100000.0:
+        return flux_toa_wm2 
+        
+    """Guard 2: Prevent negative altitude physics errors"""
+    if altitude_m <= 0.0:
+        altitude_m = 0.0 
+        
+    """Calculate atmospheric depth (Scale height approximation ~8500m)"""
+    depth = math.exp(-altitude_m / 8500.0)
+    mu_attenuation = 0.005 
+    
+    return flux_toa_wm2 * math.exp(-mu_attenuation * depth)
+
+@njit(fastmath=True)
+def compute_radiation_interference(xray_flux_wm2, altitude_m):
+    """Calculates radar/ADS-B signal degradation percentage caused by solar scattering."""
+    
+    """Guard 1: Tropospheric shielding fully protects sensors below 30,000 ft (9144 m)"""
+    if altitude_m < 9144.0:
+        return 0.0
+        
+    """Guard 2: X-Class solar flares cause maximum radar blindness (100 percent penalty)"""
+    if xray_flux_wm2 >= 1e-4:
+        return 1.0
+        
+    baseline_flux = 1e-8
+    
+    """Guard 3: Prevent log math errors on negative or perfectly calm sensors"""
+    if xray_flux_wm2 <= baseline_flux:
+        return 0.0
+        
+    """Happy Path: Logarithmic scaling for M and C class flares"""
+    ratio = xray_flux_wm2 / baseline_flux
+    interference = math.log10(ratio) / 4.0
+    
+    return interference
+
+@njit(fastmath=True)
+def compute_hull_radiative_cooling(temp_hull_k, emissivity, surface_area_m2):
+    """Stefan-Boltzmann Law: Calculates Watts of heat dumped into space via radiation."""
+    
+    """Guard: Invalid physical states return zero cooling"""
+    if temp_hull_k <= 0.0 or surface_area_m2 <= 0.0 or emissivity <= 0.0:
+        return 0.0
+        
+    STEFAN_BOLTZMANN = 5.670374419e-8
+    
+    """Space temperature is ~2.7 Kelvin. Subtracting it is mathematically negligible"""
+    """compared to a hot hull, so we execute pure raw emission."""
+    return emissivity * STEFAN_BOLTZMANN * surface_area_m2 * (temp_hull_k ** 4)
+
+"""THE COLLISION RADAR BRIDGE"""
+
+def get_flux_interference(telemetry_payload=None):
+    """The master bridge method called dynamically by collision_avoidance_app.py"""
+    
+    """Guard: Missing data defaults to a perfectly clear sensor state"""
+    if not telemetry_payload:
+        return 0.0 
+        
+    alt_m = telemetry_payload.get('altitude_m', 0.0)
+    xray_raw = telemetry_payload.get('xray_flux_wm2', 1e-8)
+    
+    """Step 1: Filter the space radiation through the atmosphere"""
+    surviving_flux = compute_atmospheric_attenuation(xray_raw, alt_m)
+    
+    """Step 2: Calculate how much the surviving radiation degrades the radar"""
+    return float(compute_radiation_interference(surviving_flux, alt_m))
 def calculate_radiative_flux_grid(
     cloud_fraction_array, surface_albedo_array, 
     temp_surf_c_array, temp_cloud_c_array, zenith_deg_array
@@ -57,6 +129,85 @@ def calculate_radiative_flux_grid(
             "longwave_net_w_m2": xp.round(lw_net, 15).tolist(),
             "total_net_w_m2": xp.round(net_flux, 15).tolist()
         }
+# --- MISSING TACTICAL RADIATION KERNELS ---
+
+@njit(fastmath=True)
+def compute_atmospheric_attenuation(flux_toa_wm2, altitude_m):
+    """
+    Beer-Lambert Law: Calculates radiation surviving atmospheric absorption.
+    """
+    # Guard 1: Above the Karman line (100km), no atmosphere to block radiation
+    if altitude_m >= 100000.0:
+        return flux_toa_wm2 
+        
+    # Guard 2: Prevent negative altitude physics errors
+    if altitude_m <= 0.0:
+        altitude_m = 0.0 
+        
+    # Calculate atmospheric depth (Scale height approximation ~8500m)
+    depth = math.exp(-altitude_m / 8500.0)
+    mu_attenuation = 0.005 # X-ray absorption coefficient
+    
+    return flux_toa_wm2 * math.exp(-mu_attenuation * depth)
+
+
+@njit(fastmath=True)
+def compute_radiation_interference(xray_flux_wm2, altitude_m):
+    """
+    Calculates radar/ADS-B signal degradation percentage caused by solar scattering.
+    """
+    # Guard 1: Tropospheric shielding fully protects sensors below 30,000 ft (9144 m)
+    if altitude_m < 9144.0:
+        return 0.0
+        
+    # Guard 2: X-Class solar flares cause maximum radar blindness (100% penalty)
+    if xray_flux_wm2 >= 1e-4:
+        return 1.0
+        
+    baseline_flux = 1e-8
+    
+    # Guard 3: Prevent log math errors on negative or perfectly calm sensors
+    if xray_flux_wm2 <= baseline_flux:
+        return 0.0
+        
+    # Happy Path: Logarithmic scaling for M and C class flares
+    ratio = xray_flux_wm2 / baseline_flux
+    interference = math.log10(ratio) / 4.0
+    
+    return interference
+
+
+@njit(fastmath=True)
+def compute_hull_radiative_cooling(temp_hull_k, emissivity, surface_area_m2):
+    """
+    Stefan-Boltzmann Law: Calculates Watts of heat dumped into space via radiation.
+    """
+    # Guard: Invalid physical states return zero cooling
+    if temp_hull_k <= 0.0 or surface_area_m2 <= 0.0 or emissivity <= 0.0:
+        return 0.0
+        
+    STEFAN_BOLTZMANN = 5.670374419e-8
+    
+    # Space temperature is ~2.7 Kelvin. Subtracting it is mathematically negligible 
+    # compared to a hot hull, so we execute pure raw emission.
+    return emissivity * STEFAN_BOLTZMANN * surface_area_m2 * (temp_hull_k ** 4)
+
+# --- THE COLLISION RADAR BRIDGE ---
+
+def get_flux_interference(telemetry_payload=None):
+    """
+    The master bridge method called dynamically by collision_avoidance_app.py
+    """
+    # Guard: Missing data defaults to a perfectly clear sensor state
+    if not telemetry_payload:
+        return 0.0 
+        
+    alt_m = telemetry_payload.get('altitude_m', 0.0)
+    xray_raw = telemetry_payload.get('xray_flux_wm2', 1e-8)
+    
+    # Step 1: Filter the space radiation through the atmosphere
+    surviving_flux = compute_atmospheric_attenuation(xray_raw, alt_m)
+    return float(compute_radiation_interference(surviving_flux, alt_m))
 def compute_stellar_thermodynamics_grid(masses_solar, radii_solar):
     """
     Calculates the surface temperature (K) and total thermal output (Watts)
