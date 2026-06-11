@@ -3,7 +3,6 @@ import numba
 import h5py
 import struct
 from numba import njit
-@njit(fastmath=True)
 import time
 import numpy as np
 class NASATelemetryExporter:
@@ -14,6 +13,7 @@ class NASATelemetryExporter:
     PACKET_FORMAT = ">HHd12f" # Sync(2), ID(2), Time(8), 12 Floats(48) = 60 bytes
     SYNC_WORD = 0xEB90
     @staticmethod
+    @njit(fastmath=True)
     def to_nasa_binary_packet(telemetry_dict):
         """
         Converts JSON-style telemetry into a compact 60-byte binary packet.
@@ -38,6 +38,7 @@ class NASATelemetryExporter:
             *data
         )
     @staticmethod
+    @njit(fastmath=True)
     def save_hdf5_instrument_data(filename, dataset_name, array_data):
         """
         Writes multi-dimensional instrument data (e.g., radar/weather grids)
@@ -55,6 +56,6 @@ if __name__ == "__main__":
     exporter = NASATelemetryExporter()
     payload = {"temp_c": 15.5, "pressure_hpa": 1013.2, "lat": 47.4, "lon": -122.3, "alt": 3000.0}
     binary_packet = exporter.to_nasa_binary_packet(payload)
-    print(f"📦 NASA Binary Packet Size: {len(binary_packet)} bytes")
+    print(f"NASA Binary Packet Size: {len(binary_packet)} bytes")
     mock_sensor_grid = np.random.rand(100, 100) # 100x100 weather grid
     exporter.save_hdf5_instrument_data("mission_data.h5", "weather_grid_v1", mock_sensor_grid)
