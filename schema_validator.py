@@ -22,6 +22,7 @@ class FederalConfigLoader(BaseSettings):
         env_nested_delimiter='__'
     )    
     vehicle: VehicleModel
+@njit(fastmath=True)
 def get_validated_config():
     try:
         return FederalConfigLoader()
