@@ -1,4 +1,3 @@
-import numpy as np
 try:
     import cupy as xp
     HAS_GPU = True
@@ -8,7 +7,6 @@ except ImportError:
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 import pandas as pd
 import csv
 import matplotlib.pyplot as plt
@@ -21,6 +19,7 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
+@njit(fastmath=True)
 def run_multi_scenario_matrix_export(telemetry_override=None):
     print("=================================================================")
     print("     AVIATION PERFORMANCE SPREADSHEET COMPILING ENGINE          ")
