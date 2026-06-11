@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 import telemetry_link
 import datetime
 from telemetry_link import time_manager
