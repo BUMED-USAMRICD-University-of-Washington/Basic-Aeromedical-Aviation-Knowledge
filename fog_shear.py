@@ -9,7 +9,6 @@ except ImportError:
     import numpy as xp
     HAS_GPU = False
 from numba import njit
-@njit(fastmath=True)
 import pandas as pd
 import aviation_physics        # Core math
 import aviation_telemetry      # Data flow
@@ -17,6 +16,7 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
+@njit(fastmath=True)
 def simulate_cooling_with_wind_shear(
     telemetry_override=None,
     lwp_initial,
