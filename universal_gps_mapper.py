@@ -1,5 +1,4 @@
 from numba import njit
-@njit(fastmath=True)
 import math
 try:
     import cupy as xp
@@ -13,6 +12,7 @@ class UniversalGPSMapper:
     on ANY celestial body, accounting for local planetary rotation and radius.
     """
     @staticmethod
+    @njit(fastmath=True)
     def calculate_extraterrestrial_intercept(
         ship_position_m, 
         closing_velocity_m_s, 
