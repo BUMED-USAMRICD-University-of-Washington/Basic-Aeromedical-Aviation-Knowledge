@@ -4,18 +4,16 @@ try:
 except ImportError:
     import numpy as xp
     HAS_GPU = False
-import pandas as pd
 import matplotlib.pyplot as plt
 import numba
 from numba import njit
-@njit(fastmath=True)
 import telemetry_link
 import aviation_physics
 import aircraft_perf
 import aviation_telemetry
 import aerodynamic_matrix
-import streamlit as st
 import sensor_thermodynamics
+@njit(fastmath=True)
 def calculate_density_and_cooling(temp_c, wind_mph, relative_humidity=0.50):
     """
     Solves the combined gas density and convective wind cooling equations
@@ -39,6 +37,7 @@ def calculate_density_and_cooling(temp_c, wind_mph, relative_humidity=0.50):
         wind_chill_c = temp_c
         cooling_delta = 0.0
     return air_density, wind_chill_c, cooling_delta
+@njit(fastmath=True)
 def run_wind_layer(telemetry_override=None):
     """
     Main orchestration function. Extracts live telemetry, runs the high-performance
