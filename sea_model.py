@@ -16,9 +16,9 @@ import aviation_telemetry
 import aircraft_perf
 import numba
 from numba import njit
-@njit(fastmath=True)
 import sensor_thermodynamics
 import aerodynamic_matrix
+@njit(fastmath=True)
 def run_sea_layer(telemetry_override=None):
     st.header("🌲 Seattle (SEA / KATX Area) Convergence & Orographic Model")
     st.markdown(r"### Equation: $T_{\text{SEA}}(d) = T_{\text{rural}} + \Delta T_{\text{olympic}} \cdot \Theta(v) - \Delta T_{\text{pscz}} \cdot \Theta(\text{Wind}) + \Delta T_{\text{station}}$")
