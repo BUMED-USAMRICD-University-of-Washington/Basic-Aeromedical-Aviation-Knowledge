@@ -24,12 +24,10 @@ except ImportError:
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")
 from engine_profiler import JetAcousticProfiler
-
+@njit(fastmath=True)
 def run_telemetry_simulation_with_profiling():
-    # 1. Initialize analyzer hardware configuration profile
     engine_analyzer = MaxPowerAcousticMatrix(fixed_length=2.450, nozzle_radius=0.435)
     
-    # 2. Instantiate our new profile memory manager tracking module
     active_profile = JetAcousticProfiler(jet_name="Lockheed_F35_Variant")
     
     audio_thread = AsyncAcousticTuner()
@@ -38,33 +36,24 @@ def run_telemetry_simulation_with_profiling():
     
     print("\n--- Sweeping Throttle Ranges to Compile Engine Acoustic Profile Matrix ---")
     
-    # Simulate a throttle sweep sequence moving from 10% cruise idle to 100% full military power
     for target_throttle in range(10, 101, 10):
         print(f"[FLIGHT STATE] Adjusting Engine Throttle -> {target_throttle}%")
         
-        # Give hardware/plume 1.5 seconds to settle to let microphones catch the new frequency node
         time.sleep(1.5)
         
-        # Calculate changing gas conditions based on current mechanical velocity states
         simulated_temp_k = 900.0 + (target_throttle * 3.5) 
         live_tone_hz = audio_thread.get_frequency()
         
-        # If running a desktop simulation without a physical live engine mic attached,
-        # fallback to an auto-scaling frequency model so the software generates shapes:
         if live_tone_hz == 0:
             live_tone_hz = 120.0 + (target_throttle * 2.8)
 
-        # Run core aerospace analytical matrix equations
         metrics = engine_analyzer.evaluate_max_power_tuning(live_tone_hz, simulated_temp_k)
         
-        # Capture variables directly into current session memory matrix
         active_profile.log_throttle_point(target_throttle, live_tone_hz, simulated_temp_k, metrics)
     
-    # 3. Execution Sweep Finalized: Save data and trigger the visual interface output canvas
     audio_thread.stop()
     audio_thread.join()
     
-    # Output Actions
     active_profile.save_profile_to_disk()
     active_profile.generate_tuning_graph()
 
@@ -207,7 +196,7 @@ class MaxPowerAcousticMatrix:
             "cancellation_efficiency_percent": round(cancellation_efficiency * 100, 2),
             "scavenging_thrust_gain_newtons": round(scavenging_thrust_gain_n, 1)
         }
-
+@njit(fastmath=True)
 def run_telemetry_simulation():
     engine_analyzer = MaxPowerAcousticMatrix(
         fixed_length=2.450, 
