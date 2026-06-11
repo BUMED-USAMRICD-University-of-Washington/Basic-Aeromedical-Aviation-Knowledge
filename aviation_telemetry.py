@@ -10,6 +10,77 @@ import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
 import multiprocessing as mp
+"""MISSING KERNELS: aviation_telemetry.py"""
+import numpy as np
+import math
+from numba import njit
+
+@njit(fastmath=True)
+def compute_dead_reckoning(p_last, v_last, a_last, delta_t_sec):
+    """Extrapolates position between low-frequency hardware pings (10Hz) for the 120Hz loop."""
+    
+    """Guard: No time passed"""
+    if delta_t_sec <= 0.0:
+        return p_last
+        
+    """P_future = P_last + (V * t) + (0.5 * A * t^2)"""
+    extrapolated_pos = p_last + (v_last * delta_t_sec) + (0.5 * a_last * (delta_t_sec ** 2))
+    
+    return extrapolated_pos
+
+
+@njit(fastmath=True)
+def compute_alpha_smoothing_filter(state_last, raw_ping, alpha):
+    """Exponential Moving Average to strip hardware noise from raw GPS pings."""
+    
+    """Guard: Ignore completely invalid raw pings"""
+    if np.isnan(raw_ping).any():
+        return state_last
+        
+    """Guard: Bounds check alpha to prevent math inversion"""
+    if alpha < 0.01:
+        alpha = 0.01
+    if alpha > 1.0:
+        alpha = 1.0
+        
+    """S_k = S_k-1 + alpha * (Z_k - S_k-1)"""
+    return state_last + alpha * (raw_ping - state_last)
+
+
+@njit(fastmath=True)
+def compute_euler_rotation_world_frame(roll_rad, pitch_rad, yaw_rad, v_body):
+    """Rotates onboard Gyro/Chassis telemetry into the global Earth coordinate frame."""
+    
+    """Guard: Zero rotation matrices return body vector natively"""
+    if roll_rad == 0.0 and pitch_rad == 0.0 and yaw_rad == 0.0:
+        return v_body
+        
+    """Pre-compute trigonometry"""
+    cy, sy = math.cos(yaw_rad), math.sin(yaw_rad)
+    cp, sp = math.cos(pitch_rad), math.sin(pitch_rad)
+    cr, sr = math.cos(roll_rad), math.sin(roll_rad)
+    
+    """Z-Y-X Euler Rotation Matrix Variables"""
+    m00 = cy * cp
+    m01 = cy * sp * sr - sy * cr
+    m02 = cy * sp * cr + sy * sr
+    
+    m10 = sy * cp
+    m11 = sy * sp * sr + cy * cr
+    m12 = sy * sp * cr - cy * sr
+    
+    m20 = -sp
+    m21 = cp * sr
+    m22 = cp * cr
+    
+    """Apply transformation"""
+    v_world_x = m00 * v_body[0] + m01 * v_body[1] + m02 * v_body[2]
+    v_world_y = m10 * v_body[0] + m11 * v_body[1] + m12 * v_body[2]
+    v_world_z = m20 * v_body[0] + m21 * v_body[1] + m22 * v_body[2]
+    
+    return np.array([v_world_x, v_world_y, v_world_z])
+
+
 def simulate_runway_performance_log(
     telemetry_override=None,
     initial_temp=26.0,
