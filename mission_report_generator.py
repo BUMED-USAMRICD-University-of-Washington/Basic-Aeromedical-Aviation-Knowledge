@@ -1,7 +1,6 @@
 from dynamic_memory_cache import DynamicMemoryCache
 import numba
 from numba import njit
-@njit(fastmath=True)
 shared_cache = DynamicMemoryCache(percentage=0.04)
 try:
     import cupy as xp
@@ -16,8 +15,10 @@ class MissionReportGenerator:
     Consolidates exported flight data from PID guidance 
     and atmospheric entry phases into a tactical PDF/Report format.
     """
+    @njit(fastmath=True)
     def __init__(self, log_path="logs/optimized_3d_pid_trajectory.csv"):
         self.log_path = log_path
+    @njit(fastmath=True)
     def generate_tactical_summary(self):
         df = pd.read_csv(self.log_path)
         peak_g = df['Acceleration_g'].max()
