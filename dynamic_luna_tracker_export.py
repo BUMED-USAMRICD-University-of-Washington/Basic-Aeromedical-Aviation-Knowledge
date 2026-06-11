@@ -1,8 +1,6 @@
-# --- PRIMARY ENGINE: [Model Name] ---
 import multiprocessing as mp
 import numpy as np
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
@@ -11,21 +9,22 @@ import astropy.units as u
 from astropy.time import Time
 import csv
 import streamlit as st
-
-# --- SECONDARY ENGINE DEPENDENCIES ---
-import aviation_physics        # Core math
-import aviation_telemetry      # Data flow
-import aircraft_perf           # Performance calculations
-import sensor_thermodynamics   # Env data scaling
-import aerodynamic_matrix      # Lift/Drag logic
+import aviation_physics
+import aviation_telemetry
+import aircraft_perf
+import sensor_thermodynamics
+import aerodynamic_matrix
 
 try:
-    import cupy as np  # Attempt to use GPU-accelerated array math
-    print("🚀 NVIDIA GPU Acceleration Engaged")
+    import cupy as xp
+    shared_cache = DynamicMemoryCache(percentage=0.12)
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
 except ImportError:
-    import numpy as np # Fallback to standard CPU math
-    print("⚡ Using CPU (NVIDIA acceleration not detected)")
-
+    import numpy as xp
+    HAS_GPU = False
+    print("CPU Fallback: Standard Vectorization Active (Performance)")
+    
 def get_user_inputs(telemetry_override=None):
     print("--- GPS Station Lunar Log Configurator ---")
     lat = float(input("Enter Latitude in decimal degrees (e.g., 47.6062): "))
@@ -33,7 +32,6 @@ def get_user_inputs(telemetry_override=None):
     elevation = float(input("Enter station elevation in meters (e.g., 45.0): "))
     year = int(input("Enter the target year (e.g., 2026): "))
     return year, lat, lon, elevation
-
 
 def calculate_and_export_lunar_log():
     year, lat, lon, elevation_m = get_user_inputs()
