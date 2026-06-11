@@ -7,13 +7,10 @@ except ImportError:
     import numpy as xp
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")
-from numba import njit
 import numba
-import numpy as np
-import pandas as pd
+from numba import njit
 import multiprocessing as mp
 import matplotlib.pyplot as plt
-
 from telemetry_link import time_manager
 now = time_manager.get_now()
 import aircraft_perf
@@ -21,13 +18,12 @@ import aviation_telemetry
 import sensor_thermodynamics
 import aviation_physics
 import aerodynamic_matrix
-import streamlit as st
-from numba import njit
 @njit(fastmath=True)
 def calculate_future_position():
     now = telemetry_link.time_manager.get_now() 
     future = now + datetime.timedelta(hours=48)
     return future    
+@njit(fastmath=True)
 def run_lunar_phase_modulation():
     print("\n--- Lunar Synodic Phase Anomaly Map ---")
     target_month_start = float(input("Enter start index day of lunar calendar (0 = New Moon): "))
