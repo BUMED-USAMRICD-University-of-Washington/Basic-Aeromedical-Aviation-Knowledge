@@ -71,6 +71,23 @@ def calculate_solar_flare_index(xray_flux_wm2):
     return index
 
 @njit(fastmath=True)
+def compute_geomagnetic_storm_penalty(kp_index):
+    """ 
+    Calculates radar/sensor degradation based on the Planetary K-index (Geomagnetic Storms).
+    Scale is 0 (Calm) to 9 (Extreme G5 Storm).
+    """
+    # Guard 1: Normal conditions (Kp 0 to 3) have zero effect on radar
+    if kp_index <= 3.0:
+        return 0.0
+        
+    # Guard 2: Extreme conditions (Kp 9+) completely saturate the penalty metric
+    if kp_index >= 9.0:
+        return 1.0
+        
+    # Happy Path: Normalize the storm intensity (Kp 4 to 8.9) to a 0.0-1.0 penalty curve
+    return (kp_index - 3.0) / 6.0
+    
+@njit(fastmath=True)
 def compute_radiation_dose_rate(altitude_m, solar_proton_pfu):
     """ Calculates relative radiation Sieverts dosing at high tactical altitudes. """
     if altitude_m < 10000.0 and solar_proton_pfu < 10.0:
@@ -143,21 +160,36 @@ class SpaceWeatherEngine:
         self.L1_FREQUENCY_MHZ = 1575.420000000000000
         self.BASE_NOISE_DB = 10.000000000000000
 
+    def get_kp_index_penalty(self, noaa_payload):
+        """ 
+        Extracts live Kp-Index and returns the calculated sensor penalty for the ACAS radar. 
+        Utilized dynamically by collision_avoidance_app.py.
+        """
+        # Default to 0.0 (calm) if the NOAA payload is missing the data
+        kp_index = float(noaa_payload.get('kp_index', 0.0))
+        
+        penalty = compute_geomagnetic_storm_penalty(kp_index)
+        
+        return round(float(penalty), 15)
+
     def update_space_weather_state(self, noaa_payload, current_altitude_m):
         tec_tecu = float(noaa_payload.get('tec_tecu', 0.0))
         xray_flux = float(noaa_payload.get('xray_flux_wm2', 1e-9))
         proton_pfu = float(noaa_payload.get('solar_proton_pfu', 1.0))
+        kp_index = float(noaa_payload.get('kp_index', 0.0)) # NEW
         
         gps_delay_m = compute_ionospheric_delay_m(float(tec_tecu), self.L1_FREQUENCY_MHZ)
         radio_noise_db = compute_solar_flare_attenuation(float(xray_flux), self.BASE_NOISE_DB)
         radiation_sv = compute_radiation_dose_rate(float(current_altitude_m), float(proton_pfu))
         flare_index = calculate_solar_flare_index(float(xray_flux))
+        storm_penalty = compute_geomagnetic_storm_penalty(float(kp_index)) # NEW
         
         payload = {
             "gps_delay_meters": round(float(gps_delay_m), 15),
             "radio_noise_db": round(float(radio_noise_db), 15),
             "radiation_sv": round(float(radiation_sv), 15),
-            "solar_flare_index": round(float(flare_index), 15)
+            "solar_flare_index": round(float(flare_index), 15),
+            "geomagnetic_storm_penalty": round(float(storm_penalty), 15) # NEW
         }
         
         telemetry_link.update_global_state("environment", "space_weather", payload)
