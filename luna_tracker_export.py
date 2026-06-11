@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import astropy.coordinates as coord
 from numba import njit
-@njit(fastmath=True)
 import astropy.units as u
 from astropy.time import Time
 import csv
@@ -21,6 +20,7 @@ import aircraft_perf           # Performance calculations
 import sensor_thermodynamics   # Env data scaling
 import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
+@njit(fastmath=True)
 def get_user_inputs(telemetry_override=None):
     print("--- GPS Station Lunar Log Configurator ---")
     lat = float(input("Enter Latitude in decimal degrees (e.g., 47.6062): "))
@@ -28,6 +28,7 @@ def get_user_inputs(telemetry_override=None):
     elevation = float(input("Enter station elevation in meters (e.g., 45.0): "))
     year = int(input("Enter the target year (e.g., 2026): "))
     return year, lat, lon, elevation
+@njit(fastmath=True)
 def calculate_and_export_lunar_log():
     year, lat, lon, elevation_m = get_user_inputs()
     print(f"\n[Processing] Modeling 1-year window path coordinates...")
