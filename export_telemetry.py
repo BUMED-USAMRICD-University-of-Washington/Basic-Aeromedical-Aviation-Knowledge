@@ -14,22 +14,22 @@ from northrop_grumman_exporter import NorthropGrummanExporter
 from oaam_exporter import OAAMTelemetryExporter # New OAAM Link
 
 class TelemetryDispatcher:
-    def __init__(self, output_dir="logs"):
-        self.output_dir = output_dir
-        if not os.path.exists(output_dir): os.makedirs(output_dir)
+def __init__(self, output_dir="logs"):
+    self.output_dir = output_dir
+    if not os.path.exists(output_dir): os.makedirs(output_dir)
 
     def _write_safe(self, filename, data):
         """Atomic write ensures data integrity for mission buses."""
         with open(f"{self.output_dir}/{filename}", "ab") as f:
-            fcntl.flock(f, fcntl.LOCK_EX) # Lock file
+            fcntl.flock(f, fcntl.LOCK_EX)
             f.write(data)
-            fcntl.flock(f, fcntl.LOCK_UN) # Unlock
+            fcntl.flock(f, fcntl.LOCK_UN)
         
         self.nasa = NASATelemetryExporter()
         self.lockheed = LockheedTelemetryExporter()
         self.axiom = AxiomTelemetryExporter()
         self.northrop = NorthropGrummanExporter()
-        self.oaam = OAAMTelemetryExporter() # Initialize OAAM
+        self.oaam = OAAMTelemetryExporter()
 
     def dispatch(self, payload):
         with open(f"{self.output_dir}/telemetry_{int(time.time())}.json", "w") as f:
