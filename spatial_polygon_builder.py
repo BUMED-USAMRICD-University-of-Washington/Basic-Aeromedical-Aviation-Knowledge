@@ -1,8 +1,5 @@
-import numpy as np
 from numba import njit
 import multiprocessing as mp
-@njit(fastmath=True)
-import pandas as pd
 from dynamic_memory_cache import DynamicMemoryCache
 shared_cache = DynamicMemoryCache(percentage=0.50)
 import matplotlib.pyplot as plt
@@ -14,13 +11,13 @@ import aviation_telemetry
 import aircraft_perf
 import sensor_thermodynamics
 import aerodynamic_matrix
-import streamlit as st
 try:
     import cupy as xp
     HAS_GPU = True
 except ImportError:
     import numpy as xp
     HAS_GPU = False
+@njit(fastmath=True)
 def build_radar_boundary_arrays(filepath):
     """
     Reads the exported ExpertGPS text file and extracts the vertices.
@@ -36,6 +33,7 @@ def build_radar_boundary_arrays(filepath):
     except Exception as e:
         print(f"Polygon build failure: {e}")
         return [], []
+@njit(fastmath=True)
 def batched_sensor_coverage_check(boundary_lats, boundary_lons, test_lats, test_lons):
     """
     Hardware-accelerated Point-in-Polygon Ray-Casting Algorithm.
@@ -60,6 +58,7 @@ def batched_sensor_coverage_check(boundary_lats, boundary_lons, test_lats, test_
         return inside_mask.get().tolist()
     else:
         return inside_mask.tolist()
+@njit(fastmath=True)
 def run_spatial_layer(boundary_filepath, test_coords):
     """
     Main orchestration function.
