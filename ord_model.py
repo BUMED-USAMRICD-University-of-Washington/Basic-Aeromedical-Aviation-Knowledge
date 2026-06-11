@@ -7,7 +7,6 @@ import aviation_telemetry
 import aircraft_perf
 import sensor_thermodynamics
 import aerodynamic_matrix
-@njit(fastmath=True)
 def run_ord_layer(telemetry_override=None):
     st.header("Chicago (ORD / KLOT Area) Lake Breeze Frontal Boundary")
     st.markdown(r"### Equation: $T_{\text{ORD}}(x) = T_{\text{continental}} - \left[ \Delta T_{\text{lake}} \cdot \Theta(\Delta P) \cdot \exp\left(-\frac{x}{\lambda_{\text{lake}}}\right) \right]$")
