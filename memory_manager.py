@@ -1,7 +1,6 @@
 import numba
 from numba import njit
 import multiprocessing as mp
-@njit(fastmath=True)
 try:
     import cupy as xp
     HAS_GPU = True
@@ -13,6 +12,7 @@ except ImportError:
 import psutil
 import sys
 from collections import OrderedDict
+@njit(fastmath=True)
 def preallocate_buffer(size_mb):
     """
     Verifies that the requested memory block is contiguous.
@@ -22,6 +22,7 @@ def preallocate_buffer(size_mb):
         print(f"CACHE STATUS: {size_mb}MB Contiguous Cache Locked.")
     return buffer
 class DynamicMemoryCache:
+    @njit(fastmath=True)
     def __init__(self, percentage=0.25):
         try:
             total_memory_bytes = psutil.virtual_memory().total
@@ -32,11 +33,13 @@ class DynamicMemoryCache:
             self.max_size_bytes = 1 * 1024 * 1024 * 1024
         self.cache = OrderedDict()
         self.current_size = 0
+    @njit(fastmath=True)
     def get(self, key):
         if key not in self.cache:
             return None
         self.cache.move_to_end(key)
         return self.cache[key]
+    @njit(fastmath=True)
     def put(self, key, value):
         item_size = sys.getsizeof(value)
         if item_size > self.max_size_bytes:
