@@ -5,7 +5,6 @@ shared_cache = DynamicMemoryCache(percentage=0.45)
 import multiprocessing as mp
 import numpy as np
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 import matplotlib.pyplot as plt
 import math
 import aviation_physics
@@ -27,8 +26,6 @@ except ImportError:
     """ CPU JIT Compilation """
     HAS_GPU = False
     print("CPU Fallback: Numba Vectorization Active (Aviation Physics)")
-
-
 """ ===================================================================== """
 """ --- PURE MATH KERNELS (THE BASEMENT MATHEMATICIANS) --- """
 """ These receive @njit because they only process pure numbers and arrays """
