@@ -13,7 +13,6 @@ import sensor_thermodynamics
 import aerodynamic_matrix
 import numba
 from numba import njit
-@njit(fastmath=True)
 try:
     import cupy as xp
     HAS_GPU = True
@@ -22,6 +21,7 @@ except ImportError:
     import numpy as xp
     HAS_GPU = False
     print("CPU Fallback: Standard Vectorization Active (Performance)")
+@njit(fastmath=True)
 def calculate_performance_envelope_grid(
     airspeed_array_knots, altitude_array_ft, drag_coefficient_array
 ):
@@ -49,6 +49,7 @@ def calculate_performance_envelope_grid(
             "p_req_w": xp.round(p_req_watts, 15).tolist(),
             "fuel_flow": xp.round(fuel_flow_kg_h, 15).tolist()
         }
+@njit(fastmath=True)
 def run_perf_layer(telemetry_override=None):
     """Orchestrator for Boeing/NASA payload compliance."""
     print("Running Batched Aircraft Performance Layer...")
