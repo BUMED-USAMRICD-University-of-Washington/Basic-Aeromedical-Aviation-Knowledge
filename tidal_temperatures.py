@@ -1,9 +1,6 @@
 import telemetry_link
-import numpy as np
 from numba import njit
 import multiprocessing as mp
-@njit(fastmath=True)
-import pandas as pd
 try:
     import cupy as np
     print("NVIDIA GPU Acceleration Engaged")
@@ -20,10 +17,12 @@ import aircraft_perf
 import sensor_thermodynamics
 import aerodynamic_matrix
 import streamlit as st
+@njit(fastmath=True)
 def calculate_future_position():
     now = telemetry_link.time_manager.get_now() 
     future = now + datetime.timedelta(hours=48)
     return future
+@njit(fastmath=True)
 def calculate_tidal_temperature_suppression(telemetry_override=None):
     print("\n--- Tidal Boundary Displaced Heat Flux Calculator ---")
     T_synoptic = float(input("Enter broad inland forecasted regional temperature (°F): "))
@@ -43,7 +42,6 @@ def calculate_tidal_temperature_suppression(telemetry_override=None):
     print("            TIDAL FLUX RESULTS               ")
     print("=============================================")
     print(f"Initial Shore Distance:  {D_0:.1f} meters")
-from numba import njit
 @njit(fastmath=True)
 def calculate_density_and_cooling(temp_c, wind_mph, relative_humidity=0.50):
     T_kelvin = temp_c + 273.15
