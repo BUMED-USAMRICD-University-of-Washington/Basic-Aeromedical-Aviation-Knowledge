@@ -59,7 +59,6 @@ def calculate_and_export_lunar_log():
 
     filename = f"lunar_trajectory_log_{year}_{lat:.2f}_{lon:.2f}.csv"
 
-    # Export massive 8,760 hourly row dataset to file system
     with open(filename, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(
