@@ -5,18 +5,27 @@ Integrates background microphone tracking, high-fidelity aerospace plume matrice
 and real-time JSON serialization for active node tuning across varying engine formats.
 Optimized specifically for simultaneous Max Power Output and Noise Cancellation.
 """
-
-import threading
-import time
-import json
-import datetime
-import numpy as np
+from dynamic_memory_cache import DynamicMemoryCache
+shared_cache = DynamicMemoryCache(percentage=0.55)
 import pyaudio
-
-# =====================================================================
-# MODULE 1: ASYNCHRONOUS MICROPHONE ACOUSTIC CAPTURE SYSTEM
-# =====================================================================
+import json
+import multiprocessing as mp
+import time
+import datetime
+import threading
+import numba
+from numba import njit
+try:
+    import cupy as xp
+    shared_cache = DynamicMemoryCache(percentage=0.12)
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
+except ImportError:
+    import numpy as xp
+    HAS_GPU = False
+    print("CPU Fallback: Standard Vectorization Active (Performance)")
 class AsyncAcousticTuner(threading.Thread):
+    @njit(fastmath=True)
     def __init__(self, sample_rate=44100, chunk_size=4096, noise_floor=0.005):
         super().__init__()
         self.sample_rate = sample_rate
@@ -30,6 +39,7 @@ class AsyncAcousticTuner(threading.Thread):
         self.p = None
         self.stream = None
 
+    @njit(fastmath=True)
     def run(self):
         self.p = pyaudio.PyAudio()
         try:
@@ -51,19 +61,15 @@ class AsyncAcousticTuner(threading.Thread):
                 raw_data = self.stream.read(self.chunk_size, exception_on_overflow=False)
                 audio_data = np.frombuffer(raw_data, dtype=np.float32)
                 
-                # Apply Hann window to mitigate spectral edge leakage
                 windowed_audio = audio_data * np.hanning(len(audio_data))
                 
-                # Calculate Root-Mean-Square amplitude to test noise floor limits
                 rms_amplitude = np.sqrt(np.mean(windowed_audio**2))
                 if rms_amplitude < self.noise_floor:
                     current_freq = 0.0
                 else:
-                    # Execute Fast Fourier Transform to analyze spatial frequency buckets
                     fft_magnitude = np.abs(np.fft.rfft(windowed_audio))
                     frequencies = np.fft.rfftfreq(self.chunk_size, d=1.0 / self.sample_rate)
                     
-                    # Exclude subsonic room rumblings under 20Hz
                     valid_idx = np.where(frequencies > 20.0)
                     if len(valid_idx) > 0:
                         peak_idx = np.argmax(fft_magnitude[valid_idx])
@@ -81,13 +87,16 @@ class AsyncAcousticTuner(threading.Thread):
 
         self._cleanup()
 
+    @njit(fastmath=True)
     def get_frequency(self):
         with self._lock:
             return self.latest_frequency
 
+    @njit(fastmath=True)
     def stop(self):
         self.running = False
 
+    @njit(fastmath=True)
     def _cleanup(self):
         if self.stream:
             try:
@@ -98,10 +107,8 @@ class AsyncAcousticTuner(threading.Thread):
         if self.p:
             self.p.terminate()
 
-# =====================================================================
-# MODULE 2: HIGH-FIDELITY MAX POWER ACOUSTIC MATRIX
-# =====================================================================
 class MaxPowerAcousticMatrix:
+    @njit(fastmath=True)
     def __init__(self, fixed_length=2.45, nozzle_radius=0.435, gas_constant=291.4, gamma=1.334):
         """
         Initializes the mechanical boundary parameters of the aircraft engine core.
@@ -115,6 +122,7 @@ class MaxPowerAcousticMatrix:
         # Nominal baseline thrust force for scaling metrics (e.g., F135 engine class)
         self.nominal_thrust_newtons = 130000.0 
 
+    @njit(fastmath=True)
     def evaluate_max_power_tuning(self, live_frequency, exhaust_temp_k):
         """
         Calculates fluid dynamics parameters to balance destructive acoustic 
@@ -127,28 +135,19 @@ class MaxPowerAcousticMatrix:
                 "scavenging_thrust_gain_newtons": 0.0
             }
 
-        # 1. Dynamic Speed of Sound calculation inside superheated gas environment
         c_plume = np.sqrt(self.gamma * self.R * exhaust_temp_k)
         
-        # 2. Locate exact quarter-wave node point (Optimal Cancellation Target)
         l_effective_target = c_plume / (4.0 * live_frequency)
         l_physical_target = l_effective_target - self.end_correction
         
-        # 3. Calculate alignment displacement error vector
         node_error_meters = l_physical_target - self.L_physical
         abs_error = abs(node_error_meters)
         
-        # 4. Nondimensional Helmholtz calculation validation
         omega = 2.0 * np.pi * live_frequency
         helmholtz_number = (omega * self.L_physical) / c_plume
         
-        # 5. Calculate Phase Cancellation Efficiency Profile (Bell-curve tracking)
-        # Closer the error is to 0.0 meters, the closer cancellation matches 100%
         cancellation_efficiency = np.exp(-5.0 * (abs_error ** 2))
         
-        # 6. Kinetic Scavenging Power Gain Calculation
-        # Destructive wave reflection eliminates local exhaust backpressure restrictions.
-        # Max performance gains (~3.5% kinetic volumetric efficiency leap) occur at 100% cancellation.
         max_gain_coefficient = 0.035 
         thrust_gain_factor = max_gain_coefficient * cancellation_efficiency
         scavenging_thrust_gain_n = self.nominal_thrust_newtons * thrust_gain_factor
@@ -162,11 +161,7 @@ class MaxPowerAcousticMatrix:
             "scavenging_thrust_gain_newtons": round(scavenging_thrust_gain_n, 1)
         }
 
-# =====================================================================
-# MODULE 3: CENTRAL FLIGHT INTEGRATION LOGIC & RUNNER LOOP
-# =====================================================================
 def run_telemetry_simulation():
-    # Load default configuration geometry (e.g., F-35A / F135-PW-100 baseline setup)
     engine_analyzer = MaxPowerAcousticMatrix(
         fixed_length=2.450, 
         nozzle_radius=0.435, 
@@ -174,7 +169,6 @@ def run_telemetry_simulation():
         gamma=1.334
     )
     
-    # Initialize and fire up background mic audio listeners
     audio_thread = AsyncAcousticTuner()
     audio_thread.daemon = True
     audio_thread.start()
@@ -191,21 +185,15 @@ def run_telemetry_simulation():
         while True:
             frame_id += 1
             
-            # Fetch simulated current core parameters from aircraft metrics
             simulated_rpm = 13450.0 + (np.sin(frame_id * 0.1) * 150.0)
             simulated_temp_k = 1050.0 + (np.cos(frame_id * 0.05) * 25.0)
             
-            # Read real-time frequency from the background audio processor
             live_tone_hz = audio_thread.get_frequency()
             
-            # Run the analytical gas dynamics node solver
             metrics = engine_analyzer.evaluate_max_power_tuning(live_tone_hz, simulated_temp_k)
             
-            # Compute a proportional thermodynamic modulation correction command
-            # Negative feedback forces the temperature shifts required to lock the node
             recommended_temp_delta = -50.0 * metrics["error_m"]
             
-            # Determine alignment state descriptive string
             if live_tone_hz <= 0:
                 cancellation_status = "awaiting_ignition"
                 thrust_state = "STABLE_IDLE"
@@ -216,7 +204,6 @@ def run_telemetry_simulation():
                 cancellation_status = "tuning_out_of_phase"
                 thrust_state = "THERMAL_MODULATION_ACTIVE"
 
-            # Build and serialize the comprehensive telemetry payload
             telemetry_packet = {
                 "timestamp_utc": datetime.datetime.utcnow().isoformat() + "Z",
                 "frame_id": frame_id,
@@ -245,10 +232,8 @@ def run_telemetry_simulation():
                 }
             }
             
-            # Output complete structural JSON frame directly to the simulation standard output
             print(json.dumps(telemetry_packet, indent=2))
             
-            # Throttle main execution frame loop to match 1Hz refresh bounds for human clarity
             time.sleep(1.0)
             
     except KeyboardInterrupt:
