@@ -105,7 +105,7 @@ class VehicleSpecs(BaseModel):
 """ ===================================================================== """
 
 class WaypointManager:
-    """ MISSING KERNEL: Orbital Waypoint Loitering """
+    @njit(fastmath=True)
     def generate_circular_pattern(self, center_lat, center_lon, radius_nm, waypoint_count=36):
         """ Generates a high-fidelity circular orbit (The Big Circle) natively. """
         
@@ -136,7 +136,7 @@ class WaypointManager:
         return path
 
 
-    """ MISSING KERNEL: Kinematic Environmental Degradation """
+    @njit(fastmath=True)
     def calculate_environmental_drift(self, v_current, v_wind, c_ice_penalty):
         """ Calculates velocity degradation due to ice accumulation and wind shear. """
         
@@ -151,8 +151,8 @@ class WaypointManager:
             v_net.append(net_axis)
             
         return v_net
-    """ Manages FSM, Tactical Takeoff, Entry Control, and 3D Universal Routing. """
     
+    @njit(fastmath=True)
     def __init__(self, config_path="config.json", catalog_path="src/catalog-3.23.dat"):
         """ Load the Firewall and the Space Catalog """
         self.specs = self._load_and_validate_config(config_path)
@@ -188,6 +188,7 @@ class WaypointManager:
         self.entry_controller = EntryController()
         self.dso_catalog = self._load_space_catalog(catalog_path)
 
+    @njit(fastmath=True)
     def _load_and_validate_config(self, config_path):
         """ Else-less JSON payload loader and strict data validator. """
         if not os.path.exists(config_path):
@@ -200,6 +201,7 @@ class WaypointManager:
         except (json.JSONDecodeError, PermissionError, ValidationError):
             return None
 
+    @njit(fastmath=True)
     def _load_space_catalog(self, catalog_path):
         """ Else-less DSO parser for Universal Mapping. """
         if not os.path.exists(catalog_path): return {}
@@ -209,12 +211,14 @@ class WaypointManager:
         except Exception:
             return {}
 
+    @njit(fastmath=True)
     def evaluate_ground_state(self, strut_pressures_psi, aerodynamic_lift_n, aircraft_weight_n):
         """ Weight-on-Wheels (WoW) logic matrix. """
         if aerodynamic_lift_n >= aircraft_weight_n: return 0
         if sum(strut_pressures_psi) < 1000.0: return 0
         return 1
 
+    @njit(fastmath=True)
     def determine_fsm_transition(self, ground_state, ground_speed_kts, thrust_level):
         """ Translates physical state into explicit FSM Modes. """
         if ground_state == 0:
@@ -233,6 +237,7 @@ class WaypointManager:
         self.fsm_state = "TAXIING_MODE"
         return self.fsm_state
 
+    @njit(fastmath=True)
     def check_takeoff_sequence(self, current_pos, wp1_pos, wp2_pos, wp3_pos, velocity_kts, thrust_level):
         """ Else-less Tactical Takeoff FSM anchored to 3 physical waypoints. """
         if self.current_waypoint not in ["WP1", "WP2", "WP3"]:
@@ -263,6 +268,7 @@ class WaypointManager:
 
         return "EXECUTE_TACTICAL_ROTATION"
 
+    @njit(fastmath=True)
     def process_ground_ekf_cycle(self, x_hat, u_vector, dt):
         """ Updates the ground tracking Extended Kalman Filter matrix. """
         x_new, P_new = ekf_prediction_step(xp.array(x_hat), xp.array(u_vector), self.P_matrix, self.Q_matrix, float(dt))
@@ -271,16 +277,19 @@ class WaypointManager:
         if HAS_GPU: return xp.round(x_new, 15).get().tolist()
         return xp.round(x_new, 15).tolist()
 
+    @njit(fastmath=True)
     def set_s_turn_mode(self, active: bool):
         self.s_turn_enabled = active
         telemetry_link.update_global_state("navigation", "s_turn_mode", self.s_turn_enabled)
         return self.s_turn_enabled
 
+    @njit(fastmath=True)
     def _inject_s_turn_maneuver(self, intercept_dict):
         intercept_dict['maneuver'] = "S-TURN_ENERGY_BLEED"
         intercept_dict['bank_cmd_deg'] = 45.000000000000000
         return intercept_dict
 
+    @njit(fastmath=True)
     def export_planned_trajectory(self, current_pos, current_vel, time_horizon_s=60.0, dt=1.0):
         if not self.active_space_target: return []
 
@@ -301,6 +310,7 @@ class WaypointManager:
             
         return trajectory
 
+    @njit(fastmath=True)
     def calculate_universal_intercept(self, ship_pos, ship_vel, target_alt_m=0.0):
         """ Standard 3D Intercept Engine. """
         if not self.active_space_target: return None
@@ -321,6 +331,7 @@ class WaypointManager:
             "time_to_intercept_sec": round(float(tti), 15)
         }
 
+    @njit(fastmath=True)
     def calculate_tactical_approach(self, ship_pos, ship_vel, altitude_m):
         """ Absolute Navigation Gatekeeper. Triggers Atmospheric Entry if descending to Earth. """
         
