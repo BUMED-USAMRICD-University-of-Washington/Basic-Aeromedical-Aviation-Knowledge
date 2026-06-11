@@ -1,5 +1,4 @@
 import cudf
-import numpy as np
 try:
     import cupy as xp
     HAS_GPU = True
@@ -10,9 +9,7 @@ except ImportError:
     print("CPU Fallback: Standard Vectorization Active (Performance)")
 import numba
 from numba import njit
-@njit(fastmath=True)
 import matplotlib.pyplot as plt
-import pandas as pd
 import requests
 from datetime import datetime
 from io import StringIO
@@ -21,8 +18,8 @@ import aviation_telemetry
 import sensor_thermodynamics
 import aviation_physics
 import aerodynamic_matrix
-import streamlit as st
 @st.cache_data(ttl=3600)
+@njit(fastmath=True)
 def load_gpu_accelerated_config(jsonl_filepath):
     df = cudf.read_json(jsonl_filepath, lines=True)
     return df
@@ -34,6 +31,7 @@ USCRN_STATION_MAP = {
     "KSEA": {"uscrn_id": "94299", "name": "WA Quinault 4 NE"},
     "KFFC": {"uscrn_id": "53838", "name": "GA Watkinsville 5 S"}
 }
+@njit(fastmath=True)
 def fetch_rural_baseline(target_icao):
     """
     Fetches the most recent hourly temperature from the nearest pristine USCRN station.
