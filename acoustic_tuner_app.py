@@ -1,4 +1,3 @@
-
 """
 Acoustic Wave Resonant Tuning Engine
 Integrates background microphone tracking, high-fidelity aerospace plume matrices,
