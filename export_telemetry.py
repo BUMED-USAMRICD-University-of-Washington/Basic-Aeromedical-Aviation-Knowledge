@@ -1,14 +1,12 @@
-# --- PRIMARY ENGINE: Multi-Protocol Telemetry Dispatcher ---
 import os
 import json
 import time
 import numpy as np
-import fcntl  # Use for file locking (Linux/Unix-based Avionics)
+import fcntl
 import struct
-import zlib   # For CRC generation
+import zlib
 import h5py
 
-# Protocol Exporters
 from nasa_telemetry_exporter import NASATelemetryExporter
 from lockheed_telemetry_exporter import LockheedTelemetryExporter
 from axiom_telemetry_exporter import AxiomTelemetryExporter
@@ -34,31 +32,23 @@ class TelemetryDispatcher:
         self.oaam = OAAMTelemetryExporter() # Initialize OAAM
 
     def dispatch(self, payload):
-        # 1. Boeing Standard (Ground UI/JSON)
         with open(f"{self.output_dir}/telemetry_{int(time.time())}.json", "w") as f:
             json.dump(payload, f, indent=4)
             
-        # 2. NASA (Science/Deep Space)
         self.nasa.dispatch(payload, self.output_dir)
         
-        # 3. Lockheed Martin (Deterministic Avionics)
         self.lockheed.dispatch(payload, self.output_dir)
         
-        # 4. Axiom Space (Orbital Data Center)
         self.axiom.dispatch(payload, self.output_dir)
         
-        # 5. Northrop Grumman (Open Mission Systems)
         self.northrop.dispatch(payload, self.output_dir)
         
-        # 6. OAAM (Plug & Fly Topology)
         self.oaam.dispatch(payload, self.output_dir)
         
-        print(f"🚀 Global Telemetry Dispatched: [Boeing] [NASA] [Lockheed] [Axiom] [Northrop] [OAAM]")
+        print(f"Global Telemetry Dispatched: [Boeing] [NASA] [Lockheed] [Axiom] [Northrop] [OAAM]")
 
     def _generate_northrop_frame(self, payload):
-        # Generate raw frame
         frame = struct.pack(">H", 0xABCD, ...) # (your previous struct logic)
-        # Append CRC-32 Checksum
         checksum = zlib.crc32(frame) & 0xFFFFFFFF
         return frame + struct.pack(">I", checksum)
 
