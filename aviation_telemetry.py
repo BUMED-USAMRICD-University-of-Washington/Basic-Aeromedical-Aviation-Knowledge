@@ -1,6 +1,5 @@
 import numpy as np
 from numba import njit
-@njit(fastmath=True) # fastmath enables hardware-level floating point optimizations
 import pandas as pd
 import matplotlib.pyplot as plt
 import aviation_physics        # Core math
@@ -11,9 +10,7 @@ import aerodynamic_matrix      # Lift/Drag logic
 import streamlit as st
 import multiprocessing as mp
 """MISSING KERNELS: aviation_telemetry.py"""
-import numpy as np
 import math
-from numba import njit
 
 @njit(fastmath=True)
 def compute_dead_reckoning(p_last, v_last, a_last, delta_t_sec):
@@ -45,7 +42,6 @@ def compute_alpha_smoothing_filter(state_last, raw_ping, alpha):
         
     """S_k = S_k-1 + alpha * (Z_k - S_k-1)"""
     return state_last + alpha * (raw_ping - state_last)
-
 
 @njit(fastmath=True)
 def compute_euler_rotation_world_frame(roll_rad, pitch_rad, yaw_rad, v_body):
@@ -80,7 +76,7 @@ def compute_euler_rotation_world_frame(roll_rad, pitch_rad, yaw_rad, v_body):
     
     return np.array([v_world_x, v_world_y, v_world_z])
 
-
+@njit(fastmath=True)
 def simulate_runway_performance_log(
     telemetry_override=None,
     initial_temp=26.0,
