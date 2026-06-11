@@ -1,143 +1,247 @@
 from dynamic_memory_cache import DynamicMemoryCache
 shared_cache = DynamicMemoryCache(percentage=0.45)
-try:
-    import cupy as xp
-    HAS_GPU = True
-    print("NVIDIA CUDA Cores Engaged: Array Batching Active (Performance)")
-except ImportError:
-    import numpy as xp
-    HAS_GPU = False
-    print("CPU Fallback: Standard Vectorization Active (Performance)")import telemetry_link
 import multiprocessing as mp
 from telemetry_link import time_manager
 now = time_manager.get_now()
 import os
 import struct
+import math
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord, FK5
 import astropy.units as u
 from astropy.time import Time
 import telemetry_link          
-import aviation_physics        
-class KinematicForceEngine:
-    """
-    Calculates planetary velocities, rotations, and applies 
-    environmental force corrections (J2 oblateness & Space Wind).
-    """
-    def __init__(self): 
-        self.G = 6.67430e-11
-    def calculate_future_position():
-    now = telemetry_link.time_manager.get_now() 
-    future = now + datetime.timedelta(hours=48)
-    return future
-    def calculate_kinematics_and_forces(
-        self,
-        pos_t1,
-        pos_t2,
-        dt,
-        planet_mass,
-        planet_radius,
-        ship_mass,
-        ship_area,
-        drag_coeff,
-        wind_velocity_vec,
-        wind_density,
-        j2_factor
-    ):
-        """
-        Processes multiple spatial readings to extract velocity and apply corrections.
-        """
-        velocity_vec = (np.array(pos_t2) - np.array(pos_t1)) / dt
-        velocity_mag = np.linalg.norm(velocity_vec)
-        r_vec = np.array(pos_t2)
-        r_mag = np.linalg.norm(r_vec)
-        gravity_force_mag = self.G * (planet_mass * ship_mass) / (r_mag**2)
-        r_hat = -r_vec / r_mag 
-        gravity_vec = gravity_force_mag * r_hat
-        sin_phi = r_vec[2] / r_mag if r_mag != 0 else 0
-        j2_accel_factor = -(3/2) * j2_factor * (self.G * planet_mass / (r_mag**2)) * ((planet_radius / r_mag)**2)
-        a_x = j2_accel_factor * (1 - 5 * sin_phi**2) * (r_vec[0] / r_mag)
-        a_y = j2_accel_factor * (1 - 5 * sin_phi**2) * (r_vec[1] / r_mag)
-        a_z = j2_accel_factor * (3 - 5 * sin_phi**2) * (r_vec[2] / r_mag)
-        j2_accel_vec = np.array([a_x, a_y, a_z])
-        j2_force_vec = j2_accel_vec * ship_mass
-        v_rel_vec = np.array(wind_velocity_vec) - velocity_vec
-        v_rel_mag = np.linalg.norm(v_rel_vec)
-        wind_force_vec = 0.5 * wind_density * drag_coeff * ship_area * v_rel_mag * v_rel_vec
-        total_force_vec = gravity_vec + j2_force_vec + wind_force_vec
-        return {
-            "orbital_velocity_m_s": velocity_mag,
-            "velocity_vector": velocity_vec,
-            "pure_gravitational_force_n": gravity_vec,
-            "j2_gravitational_correction_n": j2_force_vec,
-            "space_wind_force_n": wind_force_vec,
-            "total_corrected_force_field_n": total_force_vec
+import aviation_physics
+""" space_weather_engine.py """
+""" Space Weather Degradation & Extraterrestrial Kinematic Engine """
+""" Optimized: Else-Less Guard Clauses | 15-Decimal Precision | Numba Kernels """
+
+""" --- HARDWARE ABSTRACTION LAYER (HAL) --- """
+try:
+    import cupy as xp
+    from numba import dummy_njit as njit
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Matrix Allocation Active (Space Weather & Kinematics)")
+except ImportError:
+    import numpy as xp
+    from numba import njit
+    HAS_GPU = False
+    print("CPU Fallback: Numba Vectorization Active (Space Weather & Kinematics)")
+
+
+""" ===================================================================== """
+""" --- PURE MATH KERNELS (THE BASEMENT MATHEMATICIANS) --- """
+""" ===================================================================== """
+
+@njit(fastmath=True)
+def compute_ionospheric_delay_m(tec_tecu, frequency_mhz):
+    """ Calculates physical signal propagation delay for L1/L2 GPS bands. """
+    if tec_tecu <= 0.0:
+        return 0.0
+        
+    delay_meters = (40.3 * (tec_tecu * 1e16)) / ((frequency_mhz * 1e6) ** 2)
+    return delay_meters
+
+@njit(fastmath=True)
+def compute_solar_flare_attenuation(xray_flux_wm2, base_noise_db):
+    """ Calculates D-Region absorption (radio blackout) based on GOES X-ray flux. """
+    if xray_flux_wm2 < 1e-8:
+        return base_noise_db
+    
+    attenuation_factor = 1.0 + math.log10(xray_flux_wm2 * 1e8)
+    
+    if attenuation_factor < 1.0:
+        return base_noise_db
+        
+    return base_noise_db * attenuation_factor
+
+@njit(fastmath=True)
+def calculate_solar_flare_index(xray_flux_wm2):
+    """ Normalizes GOES X-ray flux to a 0.0 to 1.0 collision safety degradation index. """
+    if xray_flux_wm2 <= 1e-8:
+        return 0.0
+        
+    flux_log = math.log10(xray_flux_wm2)
+    index = (flux_log + 8.0) / 5.0
+    
+    if index > 1.0:
+        return 1.0
+        
+    return index
+
+@njit(fastmath=True)
+def compute_radiation_dose_rate(altitude_m, solar_proton_pfu):
+    """ Calculates relative radiation Sieverts dosing at high tactical altitudes. """
+    if altitude_m < 10000.0 and solar_proton_pfu < 10.0:
+        return 0.0
+        
+    alt_factor = math.exp((altitude_m - 10000.0) / 5000.0)
+    dose_rate = (solar_proton_pfu * 0.005) * alt_factor
+    return dose_rate
+
+@njit(fastmath=True)
+def compute_orbital_velocity(px1, py1, pz1, px2, py2, pz2, dt):
+    """ Standard kinematic projection for space trajectories. """
+    if dt <= 0.0:
+        return 0.0, 0.0, 0.0
+        
+    vx = (px2 - px1) / dt
+    vy = (py2 - py1) / dt
+    vz = (pz2 - pz1) / dt
+    
+    return vx, vy, vz
+
+@njit(fastmath=True)
+def compute_j2_acceleration(px, py, pz, mu, r_eq, j2_factor):
+    """ Calculates J2 Oblateness perturbation (Earth's equatorial bulge gravity). """
+    r = math.sqrt(px**2 + py**2 + pz**2)
+    
+    """ GUARD 1: Prevent division by zero at origin """
+    if r <= 0.0:
+        return 0.0, 0.0, 0.0
+
+    """ HAPPY PATH: J2 harmonic matrices """
+    factor = (1.5 * j2_factor * mu * (r_eq**2)) / (r**5)
+    z_ratio_sq = (pz / r)**2
+
+    ax = factor * px * (5.0 * z_ratio_sq - 1.0)
+    ay = factor * py * (5.0 * z_ratio_sq - 1.0)
+    az = factor * pz * (5.0 * z_ratio_sq - 3.0)
+
+    return ax, ay, az
+
+@njit(fastmath=True)
+def compute_solar_wind_force(vx, vy, vz, wx, wy, wz, density, area, cd):
+    """ Calculates physical drag force generated by solar plasma pressure. """
+    rx = wx - vx
+    ry = wy - vy
+    rz = wz - vz
+    v_rel = math.sqrt(rx**2 + ry**2 + rz**2)
+
+    """ GUARD 1: No relative wind or density """
+    if v_rel <= 0.0 or density <= 0.0:
+        return 0.0, 0.0, 0.0
+
+    """ HAPPY PATH: Dynamic plasma pressure equation """
+    f_mag = 0.5 * density * (v_rel**2) * area * cd
+    fx = f_mag * (rx / v_rel)
+    fy = f_mag * (ry / v_rel)
+    fz = f_mag * (rz / v_rel)
+
+    return fx, fy, fz
+
+
+""" ===================================================================== """
+""" --- THE ORCHESTRATORS (THE WEATHER & KINEMATIC MANAGERS) --- """
+""" ===================================================================== """
+
+class SpaceWeatherEngine:
+    """ Manages cosmic telemetry and dynamically degrades GPS/Radar confidence in the FSM. """
+    
+    def __init__(self):
+        self.L1_FREQUENCY_MHZ = 1575.420000000000000
+        self.BASE_NOISE_DB = 10.000000000000000
+
+    def update_space_weather_state(self, noaa_payload, current_altitude_m):
+        tec_tecu = float(noaa_payload.get('tec_tecu', 0.0))
+        xray_flux = float(noaa_payload.get('xray_flux_wm2', 1e-9))
+        proton_pfu = float(noaa_payload.get('solar_proton_pfu', 1.0))
+        
+        gps_delay_m = compute_ionospheric_delay_m(float(tec_tecu), self.L1_FREQUENCY_MHZ)
+        radio_noise_db = compute_solar_flare_attenuation(float(xray_flux), self.BASE_NOISE_DB)
+        radiation_sv = compute_radiation_dose_rate(float(current_altitude_m), float(proton_pfu))
+        flare_index = calculate_solar_flare_index(float(xray_flux))
+        
+        payload = {
+            "gps_delay_meters": round(float(gps_delay_m), 15),
+            "radio_noise_db": round(float(radio_noise_db), 15),
+            "radiation_sv": round(float(radiation_sv), 15),
+            "solar_flare_index": round(float(flare_index), 15)
         }
-def get_jnow_coordinates(ra_hms: str, dec_dms: str, distance_kpc: float) -> dict:
+        
+        telemetry_link.update_global_state("environment", "space_weather", payload)
+        return payload
+
+
+class KinematicForceEngine:
+    """ 
+    Calculates planetary velocities, JNow coordinate synchronizations, 
+    and environmental astrodynamic forces (J2 oblateness & Space Wind).
     """
-    Converts static J2000 catalog coordinates to real-time JNow 
-    Cartesian vectors based on the current system clock.
-    """
-    current_utc_time = Time.now()
-    j2000_coord = SkyCoord(
-        ra=ra_hms, 
-        dec=dec_dms, 
-        distance=distance_kpc * u.kpc, 
-        frame='icrs'
-    )
-    jnow_coord = j2000_coord.transform_to(FK5(equinox=current_utc_time))
-    jnow_cartesian = jnow_coord.cartesian
-    return {
-        "epoch_utc": current_utc_time.iso,
-        "jnow_ra_deg": jnow_coord.ra.deg,
-        "jnow_dec_deg": jnow_coord.dec.deg,
-        "vector_x_meters": jnow_cartesian.x.to(u.m).value,
-        "vector_y_meters": jnow_cartesian.y.to(u.m).value,
-        "vector_z_meters": jnow_cartesian.z.to(u.m).value,
-        "vector_array": [
-            jnow_cartesian.x.to(u.m).value, 
-            jnow_cartesian.y.to(u.m).value, 
-            jnow_cartesian.z.to(u.m).value
-        ]
-    }
-def execute_tracking_loop():
-    """
-    Example orchestration showing how to pull sequential JNow readings
-    and compute the kinematic force corrections.
-    """
-    print("--- 🌌 Initializing Advanced Kinematics Tracking ---")
-    target_ra = '00h42m44.3s'
-    target_dec = '+41d16m09s'
-    target_dist_kpc = 765.0 
-    print("Fetching Reading 1 (T1)...")
-    reading_1 = get_jnow_coordinates(target_ra, target_dec, target_dist_kpc)
-    pos_t1 = reading_1['vector_array']
-    dt_seconds = 60.0 
-    pos_t2 = [pos_t1[0] + 15000, pos_t1[1] - 8000, pos_t1[2] + 2000]
-    engine = KinematicForceEngine()
-    results = engine.calculate_kinematics_and_forces(
-        pos_t1=pos_t1,
-        pos_t2=pos_t2,
-        dt=dt_seconds,
-        planet_mass=1.5e24,       # Target mass (kg)
-        planet_radius=6000e3,     # Target radius (m)
-        ship_mass=50000.0,        # Aircraft/Spacecraft mass (kg)
-        ship_area=120.0,          # Cross-sectional area (m^2)
-        drag_coeff=2.2,           # Drag coefficient
-        wind_velocity_vec=[400000, 0, 0], # Solar wind velocity vector (m/s)
-        wind_density=1e-12,       # Plasma density (kg/m^3)
-        j2_factor=0.00108         # Oblateness harmonic 
-    )
-    print(f"\n--- JNow Synchronization Epoch: {reading_1['epoch_utc']} ---")
-    print(f"JNow RA/Dec: {reading_1['jnow_ra_deg']:.4f}°, {reading_1['jnow_dec_deg']:.4f}°")
-    print("\n=== KINEMATIC & FORCE TELEMETRY ===")
-    print(f"Velocity Vector (m/s): {np.round(results['velocity_vector'], 2)}")
-    print(f"Absolute Speed:        {results['orbital_velocity_m_s']:.2f} m/s")
-    print("\n--- Force Decompositions (Newtons) ---")
-    print(f"Baseline Gravity: {np.round(results['pure_gravitational_force_n'], 2)} N")
-    print(f"J2 Shape Variance:{np.round(results['j2_gravitational_correction_n'], 2)} N")
-    print(f"Space Wind Drag:  {np.round(results['space_wind_force_n'], 2)} N")
-    print(f"\nTOTAL NET RECTIFIED FORCE VECTOR: {np.round(results['total_corrected_force_field_n'], 2)} N")
-if __name__ == "__main__":
-    execute_tracking_loop()
+    
+    def __init__(self):
+        """ 15-Decimal Default Constants """
+        self.G_CONST = 6.67430e-11
+
+    def get_jnow_coordinates(self, ra_deg, dec_deg, obs_time_iso):
+        """ Translates static J2000 catalog epoch coordinates into true-now coordinates. """
+        
+        """ GUARD 1: Missing coordinate input """
+        if ra_deg is None or dec_deg is None:
+            return {"status": "INVALID_COORDINATES"}
+            
+        """ HAPPY PATH: Dynamic astropy time synchronization """
+        t_obs = Time(obs_time_iso, format='isot', scale='utc')
+        coord_j2000 = SkyCoord(ra=ra_deg*u.degree, dec=dec_deg*u.degree, frame='icrs')
+        coord_jnow = coord_j2000.transform_to(FK5(equinox=t_obs))
+        
+        return {
+            "epoch_utc": obs_time_iso,
+            "jnow_ra_deg": round(float(coord_jnow.ra.degree), 15),
+            "jnow_dec_deg": round(float(coord_jnow.dec.degree), 15)
+        }
+
+    def calculate_kinematics_and_forces(self, pos_t1, pos_t2, dt, planet_mass, planet_radius, ship_area, drag_coeff, wind_vec, wind_density, j2_factor):
+        """ Consolidates orbital speed, gravity perturbations, and solar wind into unified force payload. """
+        
+        """ 1. Raw Speed """
+        vx, vy, vz = compute_orbital_velocity(
+            float(pos_t1[0]), float(pos_t1[1]), float(pos_t1[2]),
+            float(pos_t2[0]), float(pos_t2[1]), float(pos_t2[2]),
+            float(dt)
+        )
+        
+        """ 2. J2 Planetary Bulge Gravity """
+        mu = self.G_CONST * planet_mass
+        ax_j2, ay_j2, az_j2 = compute_j2_acceleration(
+            float(pos_t2[0]), float(pos_t2[1]), float(pos_t2[2]),
+            float(mu), float(planet_radius), float(j2_factor)
+        )
+        
+        """ 3. Plasma/Solar Wind Drag """
+        fx_wind, fy_wind, fz_wind = compute_solar_wind_force(
+            float(vx), float(vy), float(vz),
+            float(wind_vec[0]), float(wind_vec[1]), float(wind_vec[2]),
+            float(wind_density), float(ship_area), float(drag_coeff)
+        )
+        
+        v_mag = math.sqrt(vx**2 + vy**2 + vz**2)
+        
+        return {
+            "velocity_vector": [round(float(vx), 15), round(float(vy), 15), round(float(vz), 15)],
+            "orbital_velocity_m_s": round(float(v_mag), 15),
+            "j2_acceleration_vec": [round(float(ax_j2), 15), round(float(ay_j2), 15), round(float(az_j2), 15)],
+            "solar_wind_force_vec": [round(float(fx_wind), 15), round(float(fy_wind), 15), round(float(fz_wind), 15)]
+        }
+
+    def execute_tracking_loop(self, trajectory_points, dt_seconds, planet_mass, planet_radius, ship_area, drag_coeff, wind_vec, wind_density, j2_factor):
+        """ Master cycle for processing sequential historical tracking paths. """
+        
+        """ GUARD 1: Insufficient data to calculate derivatives """
+        if len(trajectory_points) < 2:
+            return []
+            
+        """ HAPPY PATH """
+        results = []
+        for i in range(len(trajectory_points) - 1):
+            pos_t1 = trajectory_points[i]
+            pos_t2 = trajectory_points[i+1]
+            
+            step_result = self.calculate_kinematics_and_forces(
+                pos_t1, pos_t2, dt_seconds, planet_mass, planet_radius, 
+                ship_area, drag_coeff, wind_vec, wind_density, j2_factor
+            )
+            results.append(step_result)
+            
+        return results
