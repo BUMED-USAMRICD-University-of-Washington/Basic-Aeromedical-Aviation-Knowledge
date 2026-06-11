@@ -25,3 +25,17 @@
     "actuator_override_active": false
   }
 }
+{
+  "telemetry_link": {
+    "hardware_poll_rate_hz": 10,
+    "physics_loop_rate_hz": 120,
+    "smoothing_filters": {
+      "gps_alpha": 0.15,
+      "gyro_alpha": 0.45
+    },
+    "dynamic_baselines": {
+      "requires_uscrn_moisture": true,
+      "requires_space_weather_kp": true
+    }
+  }
+}
