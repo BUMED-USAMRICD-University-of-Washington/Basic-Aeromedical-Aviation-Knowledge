@@ -9,10 +9,7 @@ except ImportError:
     import numpy as xp
     HAS_GPU = False
 import io
-import streamlit as st
-import numpy as np
 from numba import njit
-@njit(fastmath=True)
 import pandas as pd
 import matplotlib.pyplot as plt
 import aircraft_perf
@@ -20,6 +17,7 @@ import aviation_telemetry
 import sensor_thermodynamics
 import aerodynamic_matrix
 import aviation_physics
+@njit(fastmath=True)
 def load_volumetric_radar_data(telemetry_override=None, raw_text_data):
     """
     Parses the raw attribute table containing radar beam heights and trackpoints.
@@ -39,6 +37,7 @@ def load_volumetric_radar_data(telemetry_override=None, raw_text_data):
             "volumetric_slices": group[['height', 'number_of_trackpoints']].to_dict(orient='records')
         }
     return radar_profiles
+@njit(fastmath=True)
 def check_sensor_coverage(radar_profile, target_sensor_elevation_ft):
     """
     Determines if the radar's lowest beam overshoots the physical NWS thermometer.
