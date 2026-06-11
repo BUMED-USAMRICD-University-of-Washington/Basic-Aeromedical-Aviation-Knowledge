@@ -6,8 +6,6 @@ now = time_manager.get_now()
 import os
 import struct
 import math
-import numpy as np
-import pandas as pd
 from astropy.coordinates import SkyCoord, FK5
 import astropy.units as u
 from astropy.time import Time
@@ -28,8 +26,6 @@ except ImportError:
     from numba import njit
     HAS_GPU = False
     print("CPU Fallback: Numba Vectorization Active (Space Weather & Kinematics)")
-
-
 """ ===================================================================== """
 """ --- PURE MATH KERNELS (THE BASEMENT MATHEMATICIANS) --- """
 """ ===================================================================== """
