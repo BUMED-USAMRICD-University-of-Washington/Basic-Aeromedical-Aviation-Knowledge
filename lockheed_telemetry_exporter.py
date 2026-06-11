@@ -30,6 +30,7 @@ class LockheedTelemetryExporter:
             val = int(data_array[i] * scale_factor)
             output[i] = val & 0xFFFF # Mask to 16-bit
         return output
+    @njit(fastmath=True)
     def pack_mil_std_1553(self, payload):
         """
         Dispatches telemetry into a rigid binary 1553B data bus structure.
@@ -54,6 +55,7 @@ class LockheedTelemetryExporter:
             *fixed_point_words
         )
         return packet
+    @njit(fastmath=True)
     def dispatch(self, payload, output_dir="logs"):
         """
         Exports the payload as a Lockheed-standard binary bus dump.
