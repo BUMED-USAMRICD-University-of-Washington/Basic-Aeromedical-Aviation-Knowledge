@@ -15,7 +15,6 @@ except ImportError:
     import numpy as np
     print("Using CPU (NVIDIA acceleration not detected)")
 from numba import njit
-@njit(fastmath=True)
 import json
 class GalacticFlightTracker:
     """
@@ -23,6 +22,7 @@ class GalacticFlightTracker:
     3D Galactocentric coordinates relative to the Milky Way's center.
     Logs output for FAA/Space-Routing compliance.
     """
+    @njit(fastmath=True)
     def __init__(self, log_file="faa_galactic_flight_log.json"):
         self.log_file = log_file
         self.flight_data = []   
@@ -32,6 +32,7 @@ class GalacticFlightTracker:
                     self.flight_data = json.load(f)
             except json.JSONDecodeError:
                 self.flight_data = []
+    @njit(fastmath=True)
     def log_waypoint(self, callsign: str, lat_deg: float, lon_deg: float, alt_meters: float, heading: float, speed_knots: float):
         """
         Takes a terrestrial GPS ping, converts it to deep space coordinates,
@@ -79,10 +80,12 @@ class GalacticFlightTracker:
         self.flight_data.append(telemetry_frame)
         self._write_log()
         return telemetry_frame
+    @njit(fastmath=True)
     def _write_log(self):
         """Safely flushes the flight log to disk."""
         with open(self.log_file, "w") as f:
             json.dump(self.flight_data, f, indent=4)
+    @njit(fastmath=True)
     def export_to_csv(self, csv_filename="galactic_flight_path.csv"):
         """Exports the 3D path for integration with data visualization tools."""
         if not self.flight_data:
