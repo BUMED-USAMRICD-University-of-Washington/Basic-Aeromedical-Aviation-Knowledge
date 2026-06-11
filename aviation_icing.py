@@ -1,8 +1,7 @@
-import multiprocessing as mp
 """ aviation_icing.py """
 """ Structural Degradation & Thermodynamic Ice Accretion Engine """
 """ Optimized: Else-Less Guard Clauses | 15-Decimal Precision | Numba Kernels """
-
+import multiprocessing as mp
 import math
 import telemetry_link
 
@@ -50,7 +49,6 @@ def compute_liquid_water_content(temp_c, relative_humidity_pct):
     lwc_g_m3 = (relative_humidity_pct / 100.0) * temp_factor * 2.5
     return lwc_g_m3
 
-
 @njit(fastmath=True)
 def calculate_ice_accumulation_rate(lwc_g_m3, velocity_mps, collection_efficiency, dt):
     """ Calculates the raw mass of ice impacting the leading edges per second. """
@@ -67,7 +65,6 @@ def calculate_ice_accumulation_rate(lwc_g_m3, velocity_mps, collection_efficienc
     accumulated_kg = mass_rate_kg_s * dt
     
     return accumulated_kg
-
 
 @njit(fastmath=True)
 def compute_aerodynamic_penalties(current_ice_mass_kg, base_cd0, base_stall_kts):
@@ -96,6 +93,7 @@ def compute_aerodynamic_penalties(current_ice_mass_kg, base_cd0, base_stall_kts)
 class AviationIcingEngine:
     """ Manages structural health monitoring and feeds degradation data to the PID loop. """
     
+    @njit(fastmath=True)
     def __init__(self):
         """ 15-Decimal Default Baselines """
         self.total_ice_mass_kg = 0.000000000000000
@@ -103,6 +101,7 @@ class AviationIcingEngine:
         self.BASE_CD0 = 0.020000000000000
         self.BASE_STALL_KTS = 110.000000000000000
 
+    @njit(fastmath=True)
     def trigger_deicing_boots(self):
         """ Simulates pneumatic boot actuation to shed accumulated mass. """
         
@@ -115,7 +114,8 @@ class AviationIcingEngine:
         self.total_ice_mass_kg -= shed_mass
         
         return {"status": "DEICING_ACTUATED", "mass_shed_kg": round(float(shed_mass), 15)}
-
+    
+    @njit(fastmath=True)
     def update_structural_degradation(self, env_payload, ship_velocity_mps, dt=0.1):
         """ Master cycle for thermodynamic tracking. Gathers NOAA data and applies physics. """
         
@@ -141,7 +141,8 @@ class AviationIcingEngine:
         
         """ 3. Export global telemetry for the PID controllers """
         return self._export_payload()
-
+    
+    @njit(fastmath=True)
     def _export_payload(self):
         """ Packages the 15-decimal float data for the telemetry bus. """
         
