@@ -48,6 +48,46 @@ GLOBAL_MODEL_STATE = {
 }
 
 @njit(fastmath=True)
+def pack_360_bit_word_stack(decimal_string):
+    """ Translates a highly precise string into a 45-byte UNIVAC 10-word stack. """
+    
+    val = Decimal(str(decimal_string))
+    
+    """ GUARD 1: Absolute Zero (Bypasses logarithm domain errors) """
+    if val == Decimal('0.0'):
+        return (0).to_bytes(45, byteorder='big')
+        
+    """ 1. Determine Sign Bit (Sequential Override) """
+    sign_bit = 0
+    if val < Decimal('0.0'):
+        sign_bit = 1
+        
+    val_abs = abs(val)
+    
+    """ 2. Calculate Base-2 Exponent (val = m * 2^e) """
+    """ We use the natural logarithm ratio to find pure base-2 exponent """
+    two = Decimal('2')
+    log2_val = val_abs.ln() / two.ln()
+    
+    """ Force rounding down to find the absolute floor exponent """
+    e = int(log2_val.to_integral_value(rounding=ROUND_FLOOR)) + 1
+    
+    """ 3. Calculate 344-Bit Mantissa """
+    m = val_abs / (two ** e)
+    mantissa_int = int(m * (Decimal(1) << 344))
+    
+    """ 4. Apply UNIVAC Bias 16384 to Exponent """
+    raw_exponent = e + 16384
+    
+    """ 5. Assemble the 360-Bit Stack """
+    shifted_sign = sign_bit << 359
+    shifted_exp = raw_exponent << 344
+    massive_int = shifted_sign | shifted_exp | mantissa_int
+    
+    """ 6. Convert to 45-byte UDP Payload """
+    return massive_int.to_bytes(45, byteorder='big')
+
+@njit(fastmath=True)
 def convert_to_univac_72bit(value):
     """ 
     Packs a 15-decimal floating-point number into two 36-bit UNIVAC words. 
