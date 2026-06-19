@@ -221,4 +221,6 @@ def weather(ident: str = typer.Argument(..., help="ICAO code to generate report 
     typer.echo(f"Generatng Synthetic Weather Observation for {ident.upper()}...")
     reports = reporter.export_reports(ident)
     if reports:
-        typer.secho(f"\n{reports[0]}", fg=typer.colors.CYAN),
+        typer.secho(f"\n{reports[0]}", fg=typer.colors.CYAN)
+if __name__ == "__main__":
+    app()
