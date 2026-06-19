@@ -124,7 +124,46 @@ class RootWaypointManager:
     def __init__(self, airport_db_path="src/airports_db.json"):
         self.geo_engine = GeometricEngine()
         self.airport_db = self._load_airport_database(airport_db_path)
+        #self.geo_engine = WaypointManager()
+        #self.airport_db = {"KSEA": {"center_lat": 47.4489, "center_lon": -122.3093, "runways": {"16L/34R": {"heading": 340.0, "length_feet": 11901.0}}}}
+
+    def initialize_dimension_aware_hold(self, airport_id, rwy_id, raw_adsb_feed):
+        """
+        Prompts crew for structural weight details and course rules,
+        then displays up to 7 precisely sliced legal options instead of the middle.
+        """
+        apt = self.airport_db[airport_id]
+        rwy_heading = self.airport_db[airport_id]["runways"][rwy_id]["heading"]
         
+        print("\n========================================================")
+        print(f"       FAA LEGAL AIRSPACE FLIGHT-LEVEL CONFIGURATOR     ")
+        print("========================================================")
+        
+        # Interactive prompts to feed the sizing calculations
+        weight_cat = input("Enter Aircraft Weight Category (light/medium/heavy): ").lower() or "medium"
+        wingspan_m = float(input("Enter Aircraft Wingspan in meters: ") or "36.0")
+        flight_rules = input("Enter operational Flight Rules (IFR/VFR): ").upper() or "IFR"
+        
+        # Run slicing math
+        available_slices = self.geo_engine.slice_free_space_into_legal_tiers(
+            raw_adsb_feed=raw_adsb_feed,
+            center_lat=apt["center_lat"],
+            center_lon=apt["center_lon"],
+            inbound_course=rwy_heading,
+            flight_rules=flight_rules,
+            weight_cat=weight_cat,
+            wingspan_m=wingspan_m
+        )
+        
+        print(f"\n[FAA RESOLUTION] Legally Sliced Slices for Holding Inbound Heading ({rwy_heading}°):")
+        for idx, opt in enumerate(available_slices, 1):
+            print(f"  [{idx}] -> Flight Level: {opt['altitude_ft']} ft | Envelope: {opt['span_clearance']} | ({opt['faa_rule_match']})")
+            
+        selection = int(input("\nSelect specific legal tier index (1-7): ") or "1")
+        final_tier = available_slices[selection - 1]["altitude_ft"]
+        
+        print(f"\n[SUCCESS] Locked into legal FAA Flight Level: {final_tier} feet.")
+        return final_tier        
         # State tracker to manage the aircraft's active real-time flight profile
         self.active_flight_profile = {
             "target_airport": None,
