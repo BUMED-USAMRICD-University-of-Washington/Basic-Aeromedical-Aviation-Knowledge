@@ -16,6 +16,52 @@ class WaypointManager:
             "civil":     {"omega": 1.50, "psi": 2.00}
         }
 
+        # Base fuel consumption profiles mapped by weight category (Pounds Per Hour - PPH)
+        # Reflects a standard holding configuration profile at 5,000 ft
+        self.BASE_FUEL_BURN_PPH = {
+            "light": 70.0,       # Piston aircraft (approx 11-12 GPH)
+            "medium": 2400.0,    # Regional/Narrowbody Jet
+            "heavy": 11000.0,    # Widebody Transport Airliner
+            "military": 7500.0   # Tactical fighter in cruise hold
+        }
+
+    def calculate_holding_fuel_flow(self, weight_category, altitude_ft, bank_angle_deg):
+        """
+        Calculates the real-time fuel burn rate in pounds per hour, adjusted 
+        for performance degradation from altitude density and bank-angle drag.
+        """
+        cat = weight_category.lower()
+        base_burn = self.BASE_FUEL_BURN_PPH.get(cat, 2400.0)
+        
+        # Altitude scale correction (Engines burn less mass flow at higher, thinner altitudes)
+        alt_modifier = 1.0 - (0.03 * (altitude_ft / 1000.0))
+        alt_modifier = max(0.5, alt_modifier) # Safety floor boundary
+        
+        # Aerodynamic Bank Angle induced drag scaling factor
+        # Higher bank angles increase load factor, demanding more thrust power
+        bank_rad = np.radians(bank_angle_deg)
+        bank_modifier = 1.0 / max(0.5, np.cos(bank_rad))
+        
+        adjusted_fuel_flow_pph = base_burn * alt_modifier * bank_modifier
+        return adjusted_fuel_flow_pph
+
+    def evaluate_hold_time_limits(self, current_fuel_lbs, reserve_fuel_lbs, fuel_flow_pph):
+        """
+        Computes the time to Bingo fuel, converting remaining usable fuel into 
+        precise minutes of holding capability before departing for an alternate.
+        """
+        # Determine total remaining usable fuel available exclusively for the hold
+        usable_hold_fuel = current_fuel_lbs - reserve_fuel_lbs
+        
+        if usable_hold_fuel <= 0:
+            return 0.0, "CRITICAL: Current fuel is below required legal reserves. Exit hold immediately."
+            
+        # Convert hourly burn rate down to operational minute intervals
+        fuel_flow_ppm = fuel_flow_pph / 60.0
+        endurance_minutes = usable_hold_fuel / fuel_flow_ppm
+        
+        return endurance_minutes, "Fuel capacity within safe operational parameters."
+
     
     def calculate_aircraft_vertical_footprint(self, weight_category, wingspan_meters):
         """
