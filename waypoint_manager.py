@@ -25,6 +25,47 @@ except ImportError:
 """ ===================================================================== """
 """ --- PURE MATH KERNELS (THE BASEMENT MATHEMATICIANS) --- """
 """ ===================================================================== """
+@njit(fastmath=True)
+    def calculate_unified_3d_guidance(self, aircraft_telemetry, target_wp_dict, target_altitude, wind_profile, weight_category="medium"):
+        """
+        Orchestrates, maps, and executes the integrated multi-axis 3D tracking calculation.
+        """
+        # Assemble Numba-compliant arrays from raw parameter models
+        current_state_arr = np.array([
+            aircraft_telemetry["lat"],
+            aircraft_telemetry["lon"],
+            aircraft_telemetry["altitude_ft"],
+            aircraft_telemetry["tas_knots"],
+            aircraft_telemetry["heading_deg"]
+        ], dtype=np.float64)
+        
+        target_wp_arr = np.array([
+            target_wp_dict["lat"],
+            target_wp_dict["lon"]
+        ], dtype=np.float64)
+        
+        wind_vector_arr = np.array([
+            wind_profile["direction_deg"],
+            wind_profile["speed_kts"]
+        ], dtype=np.float64)
+        
+        # Pull performance parameters mapped for aircraft class
+        perf_limits = self.active_aircraft_perf.get(weight_category.lower(), self.active_aircraft_perf["medium"])
+        
+        # Execute unified loop pass
+        unified_guidance_out = compute_jit_3d_unified_guidance(
+            current_state=current_state_arr,
+            horizontal_waypoint=target_wp_arr,
+            target_altitude=float(target_altitude),
+            performance_limits=perf_limits,
+            wind_vector=wind_vector_arr
+        )
+        
+        return {
+            "commanded_vertical_speed_fpm": unified_guidance_out[0],
+            "commanded_autopilot_heading_deg": unified_guidance_out[1],
+            "resolved_crosswind_component_kts": unified_guidance_out[2]
+        }
 
 @njit(fastmath=True)
 def calculate_spatial_distance(lat1, lon1, alt1, lat2, lon2, alt2):
