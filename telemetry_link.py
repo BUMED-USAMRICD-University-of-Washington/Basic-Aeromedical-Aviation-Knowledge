@@ -95,6 +95,46 @@ def convert_to_univac_72bit(value):
     
     return word1, word2
 
+@njit(fastmath=True)
+def pack_360_bit_word_stack(decimal_string):
+    """ Translates a highly precise string into a 45-byte UNIVAC 10-word stack. """
+    
+    val = Decimal(str(decimal_string))
+    
+    """ GUARD 1: Absolute Zero (Bypasses logarithm domain errors) """
+    if val == Decimal('0.0'):
+        return (0).to_bytes(45, byteorder='big')
+        
+    """ 1. Determine Sign Bit (Sequential Override) """
+    sign_bit = 0
+    if val < Decimal('0.0'):
+        sign_bit = 1
+        
+    val_abs = abs(val)
+    
+    """ 2. Calculate Base-2 Exponent (val = m * 2^e) """
+    """ We use the natural logarithm ratio to find pure base-2 exponent """
+    two = Decimal('2')
+    log2_val = val_abs.ln() / two.ln()
+    
+    """ Force rounding down to find the absolute floor exponent """
+    e = int(log2_val.to_integral_value(rounding=ROUND_FLOOR)) + 1
+    
+    """ 3. Calculate 344-Bit Mantissa """
+    m = val_abs / (two ** e)
+    mantissa_int = int(m * (Decimal(1) << 344))
+    
+    """ 4. Apply UNIVAC Bias 16384 to Exponent """
+    raw_exponent = e + 16384
+    
+    """ 5. Assemble the 360-Bit Stack """
+    shifted_sign = sign_bit << 359
+    shifted_exp = raw_exponent << 344
+    massive_int = shifted_sign | shifted_exp | mantissa_int
+    
+    """ 6. Convert to 45-byte UDP Payload """
+    return massive_int.to_bytes(45, byteorder='big')
+
 """ --- CENTRALIZED DATA BUS & CACHE --- """
 class TelemetryManager:
     def __init__(self):
@@ -110,6 +150,11 @@ class TelemetryManager:
             "thermodynamics": {}
         }
         self.last_write_time = time.perf_counter()
+        """ Active Space Force Cosmos Socket Configuration """
+        self.COSMOS_IP = "192.168.1.100"
+        self.COSMOS_PORT = 12010
+        self.cosmos_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.cosmos_socket.setblocking(False)
 
     def update_state(self, domain, key, payload):
         """ Updates the master dictionary in RAM. """
@@ -156,6 +201,7 @@ class TelemetryManager:
         except PermissionError:
             pass
 
+            
 def _flush_univac(self):
         """ Applies 72-bit double precision packing for the legacy hardware bridges. """
         nav = self.state.get("navigation", {})
@@ -178,6 +224,30 @@ def _flush_univac(self):
             with open(self.UNIVAC_FILE, "w") as file:
                 json.dump(univac_payload, file)
         except PermissionError:
+            pass
+
+def _flush_cosmos_360_bit(self):
+        """ Slices 97-digit vectors into three 10-word stacks and fires via UDP. """
+        
+        nav = self.state.get("navigation", {})
+        
+        """ Default to safe terrestrial zeros if deep-space data is missing """
+        x_str = str(nav.get("j2000_vector_x_au", "0.0"))
+        y_str = str(nav.get("j2000_vector_y_au", "0.0"))
+        z_str = str(nav.get("j2000_vector_z_au", "0.0"))
+        
+        """ 1. Pack individual vectors into 45-byte structures """
+        x_bytes = pack_360_bit_word_stack(x_str)
+        y_bytes = pack_360_bit_word_stack(y_str)
+        z_bytes = pack_360_bit_word_stack(z_str)
+        
+        """ 2. Concatenate into the final 135-byte payload """
+        udp_payload = x_bytes + y_bytes + z_bytes
+        
+        """ 3. Fire directly to the Cosmos Bridge """
+        try:
+            self.cosmos_socket.sendto(udp_payload, (self.COSMOS_IP, self.COSMOS_PORT))
+        except BlockingIOError:
             pass
 
 """ Global Instance for cross-file importing """
