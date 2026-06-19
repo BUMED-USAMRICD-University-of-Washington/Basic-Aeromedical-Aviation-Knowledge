@@ -87,6 +87,54 @@ def calculate_spatial_distance(lat1, lon1, alt1, lat2, lon2, alt2):
     
     total_distance = math.sqrt(horizontal_distance**2 + vertical_distance**2)
     return total_distance
+    
+    @njit(fastmath=True)
+    def process_dynamic_pattern_shear(self, ac_telemetry, live_wind_profile, dt=1.0, weight_category="medium"):
+        """
+        Intercepts current frame data, injects history records, and returns
+        stabilized holding turn limits under dynamic microburst/shear hazards.
+        """
+        # Maintain a rolling wind frame memory inside the runtime instance object
+        if not hasattr(self, "historical_wind_cache"):
+            self.historical_wind_cache = {
+                "direction_deg": live_wind_profile["direction_deg"],
+                "speed_kts": live_wind_profile["speed_kts"]
+            }
+            
+        # Assemble standard primitive arrays for Numba boundary execution
+        current_state = np.array([ac_telemetry["lat"], ac_telemetry["lon"], ac_telemetry["alt_ft"], ac_telemetry["tas_kts"], ac_telemetry["hdg_deg"]], dtype=np.float64)
+        wind_vector   = np.array([live_wind_profile["direction_deg"], live_wind_profile["speed_kts"]], dtype=np.float64)
+        last_wind     = np.array([self.historical_wind_cache["direction_deg"], self.historical_wind_cache["speed_kts"]], dtype=np.float64)
+        
+        # Max safe bank parameters appended [Climb, Descent, GlideAngle, MaxAirframeBank]
+        # Heavy transport aircraft are limited to 25° standard holding banks; Military tactical up to 45°
+        perf_map = {
+            "light":    np.array([1000.0, 1500.0, 3.0, 30.0], dtype=np.float64),
+            "medium":   np.array([2500.0, 3000.0, 3.0, 25.0], dtype=np.float64),
+            "heavy":    np.array([4000.0, 4500.0, 3.0, 25.0], dtype=np.float64),
+            "military": np.array([9000.0, 8000.0, 4.5, 45.0], dtype=np.float64)
+        }
+        perf_limits = perf_map.get(weight_category.lower(), perf_map["medium"])
+        
+        # Execute JIT compiled shear tracking module
+        shear_telemetry_bus = compute_jit_wind_shear_turn_correction(
+            current_state=current_state,
+            wind_vector=wind_vector,
+            last_wind_vector=last_wind,
+            dt=float(dt),
+            base_perf_limits=perf_limits
+        )
+        
+        # Commit current wind data to the rolling history frame for next epoch loop iteration
+        self.historical_wind_cache["direction_deg"] = live_wind_profile["direction_deg"]
+        self.historical_wind_cache["speed_kts"] = live_wind_profile["speed_kts"]
+        
+        return {
+            "measured_shear_gradient_kts_sec": shear_telemetry_bus[0],
+            "computed_safe_turn_radius_meters": shear_telemetry_bus[1],
+            "commanded_bank_angle_degrees": shear_telemetry_bus[2],
+            "structural_limit_override_engaged": bool(shear_telemetry_bus[3])
+        }
 
     @njit(fastmath=True)
     def monitor_holding_efficiency(self, current_fuel_lbs, aircraft_type, altitude_ft, bank_angle_deg, destination_diversion_fuel_lbs=1500.0):
