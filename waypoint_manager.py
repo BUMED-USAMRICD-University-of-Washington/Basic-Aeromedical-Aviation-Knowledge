@@ -124,6 +124,14 @@ class RootWaypointManager:
     def __init__(self, airport_db_path="src/airports_db.json"):
         self.geo_engine = GeometricEngine()
         self.airport_db = self._load_airport_database(airport_db_path)
+        
+        # State tracker to manage the aircraft's active real-time flight profile
+        self.active_flight_profile = {
+            "target_airport": None,
+            "target_runway": None,
+            "assigned_holding_altitude": 5000, # Default safe baseline entry
+            "atc_override_active": False
+        }
 
     def _load_airport_database(self, path):
         """Loads planetary-anchored airport data tied to Stellarium objects."""
@@ -142,6 +150,97 @@ class RootWaypointManager:
                     "16R/34L": {"heading": 160.0, "length_feet": 8500.0}
                 }
             }
+        }
+
+    def monitor_airport_airspace(self, airport_id, raw_adsb_feed):
+        """
+        Can be wired to background tracking threads to monitor ANY mapped airport 
+        for sudden changes in runway traffic congestion.
+        """
+        if airport_id not in self.airport_db:
+            return None
+        apt = self.airport_db[airport_id]
+        
+        return self.geo_engine.analyze_adsb_traffic_density(
+            adsb_raw_data=raw_adsb_feed,
+            center_lat=apt["center_lat"],
+            center_lon=apt["center_lon"]
+        )
+
+    def update_holding_altitude_mid_flight(self, new_altitude, source="pilot"):
+        """
+        Allows the pilot or an automated ATC command parser to change 
+        holding configurations dynamically at any frame during navigation.
+        """
+        self.active_flight_profile["assigned_holding_altitude"] = new_altitude
+        if source == "atc":
+            self.active_flight_profile["atc_override_active"] = True
+        else:
+            self.active_flight_profile["atc_override_active"] = False
+            
+        return f"Flight guidance loop updated. Target Altitude: {new_altitude} ft. Source: {source.upper()}"
+
+    def process_airport_arrival(self, airport_id, rwy_id, aircraft_heading, tas_knots, wind_speed, wind_dir, mode="land", raw_adsb_feed=None, requested_altitude=None):
+        """
+        Upgraded arrival process. Integrates automated ADS-B traffic sorting, 
+        initial altitude selection, and emergency ATC compliance layers.
+        """
+        apt_data = self.airport_db[airport_id]
+        rwy_info = apt_data["runways"][rwy_id]
+        
+        # Track active target selections
+        self.active_flight_profile["target_airport"] = airport_id
+        self.active_flight_profile["target_runway"] = rwy_id
+
+        # 1. Fetch live ADS-B congestion metrics if data stream is available
+        traffic_report = None
+        recommended_alt = 5000 # Fallback default
+        
+        if raw_adsb_feed:
+            traffic_report = self.monitor_airport_airspace(airport_id, raw_adsb_feed)
+            recommended_alt = traffic_report["recommended_clean_altitude"]
+
+        # 2. Altitude Allocation Logic Hierarchy
+        if self.active_flight_profile["atc_override_active"]:
+            # Hard priority override: Tower instructions take immediate precedence
+            final_altitude = self.active_flight_profile["assigned_holding_altitude"]
+        elif requested_altitude is not None:
+            # Secondary priority: Manual pilot entry choice
+            final_altitude = requested_altitude
+            self.active_flight_profile["assigned_holding_altitude"] = requested_altitude
+        else:
+            # Automation default: Auto-select the emptiest structural tier detected
+            final_altitude = recommended_alt
+            self.active_flight_profile["assigned_holding_altitude"] = recommended_alt
+
+        # 3. Standard meteorological runway wind analysis
+        runway_evaluation = self.geo_engine.determine_best_runway(
+            rwy_info["heading"], rwy_info["length_feet"], wind_speed, wind_dir, apt_data["center_lat"], apt_data["center_lon"]
+        )
+        
+        # 4. Enforce structural speed restrictions matching FAA altitude tiers
+        max_ias = 200 if final_altitude <= 6000 else 230
+        
+        # 5. Build waypoint tracks
+        pattern_type = self.geo_engine.calculate_holding_entry(aircraft_heading, runway_evaluation["heading"])
+        arrival_points = self.geo_engine.generate_holding_pattern_waypoints(
+            runway_evaluation["threshold"], runway_evaluation["threshold"],
+            runway_evaluation["heading"], tas_knots, wind_speed, wind_dir, pattern_type
+        )
+        
+        # Inject the dynamically determined holding altitude into every generated tracking node
+        for wp in arrival_points:
+            wp["target_altitude_ft"] = final_altitude
+
+        return {
+            "airport": airport_id,
+            "selected_runway": rwy_id,
+            "assigned_altitude": final_altitude,
+            "atc_override_engaged": self.active_flight_profile["atc_override_active"],
+            "recommended_clean_altitude": recommended_alt,
+            "max_legal_holding_ias": max_ias,
+            "traffic_density_report": traffic_report["density_map"] if traffic_report else "No ADS-B Data available",
+            "generated_waypoint_stack": arrival_points
         }
 
     def process_airport_arrival(self, airport_id, rwy_id, aircraft_heading, tas_knots, wind_speed, wind_dir, mode="land", holding_is_standard=True):
