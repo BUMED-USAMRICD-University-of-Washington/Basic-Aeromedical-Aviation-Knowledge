@@ -4,7 +4,45 @@ class WaypointManager:
     def __init__(self):
         # Earth parameters for coordinate conversion (meters per degree latitude)
         self.LAT_METERS = 111132.95
+    def analyze_adsb_traffic_density(self, adsb_raw_data, center_lat, center_lon, radius_nm=15.0):
+        """
+        Parses live ADS-B state vectors within a specific radius of the airport.
+        Groups aircraft into 1,000-ft vertical holding blocks to find the least congested level.
+        """
+        # Initialize standard aviation holding blocks (e.g., 3,000 ft up to 12,000 ft)
+        altitude_blocks = {alt: 0 for alt in range(3000, 13000, 1000)}
         
+        # Distance scaling approximation
+        lon_meters = 111412.84 * np.cos(np.radians(center_lat))
+        radius_meters = radius_nm * 1852.0  # Nautical miles to meters
+        
+        for aircraft in adsb_raw_data.get("ac", []):
+            ac_lat = aircraft.get("lat")
+            ac_lon = aircraft.get("lon")
+            ac_alt = aircraft.get("alt_baro") # Barometric altitude in feet
+            
+            if ac_lat is None or ac_lon is None or ac_alt is None:
+                continue
+                
+            # Verify if aircraft is within the airport's terminal holding airspace
+            d_lat = (ac_lat - center_lat) * self.LAT_METERS
+            d_lon = (ac_lon - center_lon) * lon_meters
+            distance = np.sqrt(d_lat**2 + d_lon**2)
+            
+            if distance <= radius_meters:
+                # Round to the nearest 1,000-foot holding assignment block
+                rounded_alt = int(round(ac_alt / 1000.0) * 1000)
+                if rounded_alt in altitude_blocks:
+                    altitude_blocks[rounded_alt] += 1
+                    
+        # Identify the block with the minimum number of target aircraft tracks
+        best_altitude = min(altitude_blocks, key=altitude_blocks.get)
+        
+        return {
+            "density_map": altitude_blocks,
+            "recommended_clean_altitude": best_altitude,
+            "traffic_at_recommendation": altitude_blocks[best_altitude]
+        }
     def get_runway_ends(self, center_lat, center_lon, true_heading, total_length_feet):
         """
         Calculates the geographic coordinates of both thresholds of a runway.
