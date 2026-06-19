@@ -147,6 +147,15 @@ class RootWaypointManager:
     def process_airport_arrival(self, airport_id, rwy_id, aircraft_heading, tas_knots, wind_speed, wind_dir, mode="land", holding_is_standard=True):
         """
         High-level orchestration entry point called by the flight UI or telemetry loop.
+
+        if airport_id not in self.airport_db:
+            raise ValueError(f"Airport identifier '{airport_id}' not found in configuration files.")
+            
+        apt_data = self.airport_db[airport_id]
+        if rwy_id not in apt_data["runways"]:
+            raise ValueError(f"Runway '{rwy_id}' does not exist at {airport_id}.")
+
+        rwy_info = apt_data["runways"][rwy_id]
         
         Parameters:
             airport_id (str): ICAO identifier (e.g., 'KSEA')
@@ -176,54 +185,64 @@ class RootWaypointManager:
             center_lat=apt_data["center_lat"],
             center_lon=apt_data["center_lon"]
         )
+        # 2. RUNWAY WIND SAFETY VALIDATION
+        is_safe, safety_msg = self.geo_engine.validate_landing_safety(
+            crosswind_kts=runway_evaluation["crosswind"],
+            max_demonstrated_crosswind=max_crosswind_limit
+        )
         
-        # 2. Extract bounding endpoints to determine the touchdown target vector
+        # If unsafe and user requested a landing, override the mode to "hold" to preserve the aircraft
+        execution_mode = mode
+        safety_override_triggered = False
+        
+        if not is_safe and mode == "land":
+            execution_mode = "hold"
+            safety_override_triggered = True
+                
+        # 3. Extract bounding endpoints to determine the touchdown target vector
         threshold_pos = runway_evaluation["threshold"]
         opposite_pos = runway_evaluation["opposite_threshold"]
         
-        # 3. Handle Mode Executions
-        if mode == "land":
-            # Generate the exact 1,000-ft past threshold vector point rather than center drop
+        # 4. Handle Mode Executions
+        if execution_mode == "land":
             td_lat, td_lon = self.geo_engine.generate_touchdown_point(
-                threshold_lat=threshold_pos[0], threshold_lon=threshold_pos[1],
+                threshold_lat=threshold_pos, threshold_lon=threshold_pos,
                 runway_heading=runway_evaluation["heading"],
-                opposite_lat=opposite_pos[0], opposite_lon=opposite_pos[1]
+                opposite_lat=opposite_pos, opposite_lon=opposite_pos
             )
             
             arrival_points = [
-                {"label": "APPROACH_ENTRY", "lat": threshold_pos[0], "lon": threshold_pos[1]},
+                {"label": "APPROACH_ENTRY", "lat": threshold_pos, "lon": threshold_pos},
                 {"label": "TOUCHDOWN_MARK", "lat": td_lat, "lon": td_lon}
             ]
             pattern_type = "Straight-In Precision Approach"
             
-        elif mode == "hold":
-            # 4. Automate FAA sector entry selection
+        elif execution_mode == "hold":
+            # Automate FAA sector entry selection
             pattern_type = self.geo_engine.calculate_holding_entry(
                 aircraft_heading=aircraft_heading,
                 inbound_course=runway_evaluation["heading"],
                 is_standard=holding_is_standard
             )
             
-            # 5. Build coordinate array blocks for the hold sequence over the threshold
+            # Build coordinate array blocks for the hold sequence over the threshold
             arrival_points = self.geo_engine.generate_holding_pattern_waypoints(
-                fix_lat=threshold_pos[0], fix_lon=threshold_pos[1],
+                fix_lat=threshold_pos, fix_lon=threshold_pos,
                 inbound_course=runway_evaluation["heading"],
                 tas_knots=tas_knots, wind_speed=wind_speed, wind_dir=wind_dir,
                 entry_type=pattern_type, is_standard=holding_is_standard
             )
-        else:
-            raise ValueError(f"Unknown operations mode: {mode}")
 
-        # 6. Apply distance kinematics to resolve arrival projections
+        # 5. Apply distance kinematics to resolve arrival projections
         target_dest = arrival_points[-1]
         ete_minutes = self.geo_engine.estimate_arrival_time(
-            current_lat=apt_data["center_lat"] + 0.1, # Arbitrary offset representing current aircraft state
+            current_lat=apt_data["center_lat"] + 0.1, 
             current_lon=apt_data["center_lon"] - 0.1,
             target_lat=target_dest["lat"], target_lon=target_dest["lon"],
             tas_knots=tas_knots, wind_speed=wind_speed, wind_dir=wind_dir
         )
         
-        # Comprehensive telemetry telemetry pack returned to flight controller systems
+        # Comprehensive telemetry pack with safety status flags
         return {
             "airport": airport_id,
             "selected_runway_side": runway_evaluation["side"],
@@ -232,9 +251,12 @@ class RootWaypointManager:
             "calculated_headwind_knots": runway_evaluation["headwind"],
             "calculated_crosswind_knots": runway_evaluation["crosswind"],
             "estimated_time_enroute_minutes": ete_minutes,
-            "generated_waypoint_stack": arrival_points
-        }
-
+            "generated_waypoint_stack": arrival_points,
+            "safety_status": {
+                "landing_allowed": is_safe,
+                "safety_override_triggered": safety_override_triggered,
+                "message": safety_msg
+            }
 # Sample testing implementation execution
 if __name__ == "__main__":
     root_manager = RootWaypointManager()
