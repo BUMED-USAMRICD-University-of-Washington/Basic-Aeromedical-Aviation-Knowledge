@@ -86,6 +86,41 @@ def calculate_spatial_distance(lat1, lon1, alt1, lat2, lon2, alt2):
     total_distance = math.sqrt(horizontal_distance**2 + vertical_distance**2)
     return total_distance
 
+    @njit(fastmath=True)
+    def monitor_holding_efficiency(self, current_fuel_lbs, aircraft_type, altitude_ft, bank_angle_deg, destination_diversion_fuel_lbs=1500.0):
+        """
+        Evaluates real-time fuel efficiency to protect the aircraft's safety margins.
+        Automatically adds the FAA legal reserve fuel requirement to diversion calculations.
+        """
+        # 1. Dynamically evaluate the current fuel flow rate
+        fuel_flow_pph = self.geo_engine.calculate_holding_fuel_flow(
+            weight_category=aircraft_type,
+            altitude_ft=altitude_ft,
+            bank_angle_deg=bank_angle_deg
+        )
+        
+        # 2. Enforce FAA Legal Reserves (45 minutes of fuel for IFR operations)
+        faa_legal_reserve_lbs = (fuel_flow_pph / 60.0) * 45.0
+        
+        # Total absolute structural safety floor (Bingo Fuel threshold)
+        total_required_reserve = destination_diversion_fuel_lbs + faa_legal_reserve_lbs
+        
+        # 3. Calculate holding time limits
+        endurance_mins, alert_msg = self.geo_engine.evaluate_hold_time_limits(
+            current_fuel_lbs=current_fuel_lbs,
+            reserve_fuel_lbs=total_required_reserve,
+            fuel_flow_pph=fuel_flow_pph
+        )
+        
+        return {
+            "calculated_fuel_flow_pph": round(fuel_flow_pph, 1),
+            "faa_45min_reserve_requirement_lbs": round(faa_legal_reserve_lbs, 1),
+            "total_bingo_fuel_threshold_lbs": round(total_required_reserve, 1),
+            "remaining_hold_endurance_minutes": round(endurance_mins, 1),
+            "safety_assessment": alert_msg,
+            "fuel_status_critical": current_fuel_lbs <= total_required_reserve
+        }
+
 @njit(fastmath=True)
 def ekf_prediction_step(x_hat, u, P, Q, dt):
     """ Non-linear State-Space EKF projection for Ground Tracking. """
