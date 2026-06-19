@@ -109,6 +109,10 @@ Root Waypoint Manager Facade.
 Orchestrates high-level automation requests, maps system inputs to low-level 
 geometric models inside src/, and interfaces directly with database and simulation loops.
 """
+def get_numba_compatible_waypoints(self, telemetry_output):
+    """Converts standard dictionary waypoints into flat NumPy arrays for Numba."""
+    points = telemetry_output["generated_waypoint_stack"]
+    return np.array([[wp["lat"], wp["lon"]] for wp in points], dtype=np.float64)
 
 # Ensure project src directory is available in the path context
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
