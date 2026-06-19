@@ -29,6 +29,15 @@ class WaypointManager:
         lon_b = center_lon - (delta_lon / lon_meters)
         
         return (lat_a, lon_a), (lat_b, lon_b)
+        
+    def validate_landing_safety(self, crosswind_kts, max_demonstrated_crosswind=15.0):
+        """
+        Validates whether the landing can be safely executed based on aircraft limits.
+        Returns a boolean status and an error message if limits are breached.
+        """
+        if abs(crosswind_kts) > max_demonstrated_crosswind:
+            return False, f"CRITICAL: Crosswind component ({crosswind_kts:.1f} kts) exceeds maximum demonstrated limit ({max_demonstrated_crosswind:.1f} kts)."
+        return True, "Weather within safe operating margins."
 
     def determine_best_runway(self, rwy_heading, total_length, wind_speed, wind_dir, center_lat, center_lon):
         """
