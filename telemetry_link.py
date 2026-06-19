@@ -109,9 +109,18 @@ def pack_360_bit_word_stack(decimal_string):
     sign_bit = 0
     if val < Decimal('0.0'):
         sign_bit = 1
-        
+    sign_bit = 1 if val < 0 else 0
     val_abs = abs(val)
+
+""" Determine Base-2 Exponent and 344-bit Mantissa """
+    two = Decimal('2')
+    e = int((val_abs.ln() / two.ln()).to_integral_value(rounding=ROUND_FLOOR)) + 1
+    mantissa_int = int((val_abs / (two ** e)) * (Decimal(1) << 344))
     
+    """ Pack Sign (1b), Exponent (15b), Mantissa (344b) """
+    raw_exponent = (e + 16384) & 0x7FFF
+    massive_int = (sign_bit << 359) | (raw_exponent << 344) | mantissa_int
+
     """ 2. Calculate Base-2 Exponent (val = m * 2^e) """
     """ We use the natural logarithm ratio to find pure base-2 exponent """
     two = Decimal('2')
