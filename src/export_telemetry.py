@@ -21,7 +21,7 @@ def export_to_1553b_binary(waypoint_stack):
 
 import struct
 
-def encode_to_1553b_avionics_bus(jit_output_array):
+def encode_to_1553b_avionics_bus(jit_output_array, shear_metrics_pack=None):
     """
     Serializes continuous JIT guidance outputs into signed 16-bit 
     MIL-STD-1553B data words using custom fixed-point binary scales.
@@ -42,8 +42,18 @@ def encode_to_1553b_avionics_bus(jit_output_array):
     word_bingo  = int(clamp(bingo_lbs / 10, 0, 32767))  # 10-lb resolution blocks
     word_endure = int(clamp(endurance_min * 10, 0, 32767)) # 0.1 minute resolution
     
-    # Pack into Big-Endian network format string (hhhhhh = 6 signed short words)
-    binary_1553b_payload = struct.pack(">hhhhhh", word_vs, word_hdg, word_xwind, word_flow, word_bingo, word_endure)
+    # Default initialize extensions if no active tracking record passed
+    word_shear_grad = 0
+    word_override   = 0
+    
+    if shear_metrics_pack:
+        # Scale gradient parameter (0.01 knot/sec resolution)
+        word_shear_grad = int(max(0, min(shear_metrics_pack["measured_shear_gradient_kts_sec"] * 100, 32767)))
+        # Binary status discrete bit flag mapping
+        word_override   = 1 if shear_metrics_pack["structural_limit_override_engaged"] else 0
+        
+    # Pack into Big-Endian network format array payload (hhhhhhhh = 8 short words, 16 bytes total)
+    binary_1553b_payload = struct.pack(">hhhhhhhh", word_vs, word_hdg, word_xwind, word_flow, word_bingo, word_endure, word_shear_grad, word_override)
     return binary_1553b_payload
 
 def clamp(val, min_val, max_val):
