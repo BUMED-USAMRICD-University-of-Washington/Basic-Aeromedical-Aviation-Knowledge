@@ -15,6 +15,107 @@ class WaypointManager:
             "us_mail":   {"omega": 1.00, "psi": 1.00},
             "civil":     {"omega": 1.50, "psi": 2.00}
         }
+
+    
+    def calculate_aircraft_vertical_footprint(self, weight_category, wingspan_meters):
+        """
+        Computes the responsible vertical airspace buffer required for the aircraft
+        based on international wake turbulence dimensions.
+        """
+        cat = weight_category.lower()
+        if cat == "light":
+            return 1000  # Standard small footprint
+        elif cat == "medium":
+            return 1000  # Standard commercial block
+        elif cat in ["heavy", "super"]:
+            return 2000  # Requires double spacing due to severe wake vortex sink
+        else:
+            return 1000
+
+    def filter_altitudes_by_faa_semi_circular_rule(self, inbound_course, flight_rules="IFR"):
+        """
+        Returns a list of legally allowable flight levels between 2,000 and 15,000 feet
+        strictly obeying FAA semi-circular cruise laws based on track heading.
+        """
+        allowed_altitudes = []
+        course = inbound_course % 360
+        
+        # Determine if the heading track is Eastbound or Westbound
+        is_eastbound = 0.0 <= course < 180.0
+        
+        for alt in range(2000, 16000, 500):
+            is_thousand = (alt % 1000 == 0)
+            is_odd = ((alt // 1000) % 2 != 0)
+            
+            if flight_rules == "IFR":
+                if is_thousand:
+                    if is_eastbound and is_odd:
+                        allowed_altitudes.append(alt)
+                    elif not is_eastbound and not is_odd:
+                        allowed_altitudes.append(alt)
+            else: # VFR Rules (+500 ft offsets)
+                if not is_thousand:
+                    if is_eastbound and is_odd:
+                        allowed_altitudes.append(alt)
+                    elif not is_eastbound and not is_odd:
+                        allowed_altitudes.append(alt)
+                        
+        return allowed_altitudes
+
+    def slice_free_space_into_legal_tiers(self, adsb_raw_data, center_lat, center_lon, inbound_course, flight_rules, weight_cat, wingspan_m, radius_nm=15.0):
+        """
+        Rejects the center-only approach. Maps the local traffic profile, extracts
+        FAA legally direction-compliant altitudes, and checks if the aircraft dimensions
+        fit cleanly into the available gaps.
+        """
+        # 1. Fetch legal altitude possibilities matching direction of flight travel
+        legal_candidates = self.filter_altitudes_by_faa_semi_circular_rule(inbound_course, flight_rules)
+        required_buffer = self.calculate_aircraft_vertical_footprint(weight_cat, wingspan_m)
+        
+        # 2. Build map of actively blocked airspace from radar data
+        blocked_altitudes = set()
+        lon_meters = 111412.84 * np.cos(np.radians(center_lat))
+        
+        for aircraft in adsb_raw_data.get("ac", []):
+            ac_lat = aircraft.get("lat")
+            ac_lon = aircraft.get("lon")
+            ac_alt = aircraft.get("alt_baro")
+            
+            if ac_lat is None or ac_lon is None or ac_alt is None:
+                continue
+                
+            d_lat = (ac_lat - center_lat) * self.LAT_METERS
+            d_lon = (ac_lon - center_lon) * lon_meters
+            dist_nm = np.sqrt(d_lat**2 + d_lon**2) / 1852.0
+            
+            if dist_nm <= radius_nm:
+                # Mark a 1,000-ft column around target traffic as entirely blocked
+                blocked_altitudes.add(int(round(ac_alt / 500.0) * 500))
+
+        # 3. Slice remaining open areas into valid choices
+        sliced_legal_options = []
+        for alt in legal_candidates:
+            # Check if our dimensional footprint overlaps with any blocked radar altitudes
+            lower_bound = alt - (required_buffer // 2)
+            upper_bound = alt + (required_buffer // 2)
+            
+            conflict_detected = False
+            for blocked_alt in blocked_altitudes:
+                if lower_bound <= blocked_alt <= upper_bound:
+                    conflict_detected = True
+                    break
+            
+            if not conflict_detected:
+                sliced_legal_options.append({
+                    "altitude_ft": alt,
+                    "faa_rule_match": f"Valid {flight_rules} Level for Course {inbound_course}°",
+                    "required_footprint_total_height_ft": required_buffer,
+                    "span_clearance": f"{lower_bound} ft to {upper_bound} ft clean"
+                })
+                
+        # Return the top 7 choices, sorted from lowest altitude upward for fuel-efficient arrivals
+        return sliced_legal_options[:7]
+        
     def analyze_adsb_traffic_density(self, adsb_raw_data, center_lat, center_lon, radius_nm=15.0):
         """
         Parses live ADS-B state vectors within a specific radius of the airport.
