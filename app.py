@@ -30,7 +30,8 @@ import aviation_physics
 import rossby_model
 import fog_thermodynamics
 import radiation_model
-def master_boot_sequence():
+if __name__ == "__main__":
+    master_boot_sequence():
     """
     Enforces a strict loading order to prevent race conditions 
     between CUDA, Numba, and Physics kernels.
@@ -53,8 +54,6 @@ def master_boot_sequence():
     from waypoint_manager import WaypointManager
     from flight_control_dynamics import FlightControlDynamics
     logger.info("SYSTEM READY: Flight systems ready for taxi, flight, and landing. Pilot must operate landing gear and toe brakes.")
-if __name__ == "__main__":
-    master_boot_sequence()
     app() # Launch your TUI
 from intent_engine import IntentEngine
 from collision_avoidance_app import CollisionMonitor
@@ -67,6 +66,18 @@ def avionics_safety_wrapper(func):
             logging.error(f"SYSTEM FAULT: {e}")
             return None
     return wrapper
+# Inside your main application loop:
+telemetry = root_manager.process_airport_arrival("KSEA", "16L/34R", 210.0, 150.0, 22.0, 340.0, mode="hold")
+
+# 1. Dispatch Audio Warning
+broadcast_atc_holding_clearance(telemetry)
+
+# 2. Extract Numba Arrays for Core Guidance Execution
+np_array_wp = root_manager.get_numba_compatible_waypoints(telemetry)
+
+# 3. Archive the Telemetry
+export_to_nasa_hdf5("flight_log.h5", 1042, telemetry, np_array_wp)
+
 class AviationConsole(App):
     CSS = """
     Screen { align: center middle; }
