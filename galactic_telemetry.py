@@ -1,6 +1,8 @@
 from dynamic_memory_cache import DynamicMemoryCache
+import math
 shared_cache = DynamicMemoryCache(percentage=0.25)
 import multiprocessing as mp
+import telemetry_link
 import os
 from datetime import datetime
 import pandas as pd
@@ -9,13 +11,146 @@ from astropy.coordinates import EarthLocation, ITRS, GCRS, Galactocentric, Carte
 from astropy.time import Time
 import astropy.units as u
 try:
-    import cupy as np
-    print("NVIDIA GPU Acceleration Engaged")
+    import cupy as xp
+    from numba import dummy_njit as njit
+    HAS_GPU = True
+    print("NVIDIA CUDA Cores Engaged: Matrix Allocation Active (Galactic Telemetry)")
 except ImportError:
-    import numpy as np
-    print("Using CPU (NVIDIA acceleration not detected)")
+    import numpy as xp
+    from numba import njit
+    HAS_GPU = False
+    print("CPU Fallback: Numba Vectorization Active (Galactic Telemetry)")
 from numba import njit
 import json
+
+""" ===================================================================== """
+""" --- PURE MATH KERNELS (THE AVIATION MATHEMATICIANS) --- """
+""" ===================================================================== """
+
+@njit(fastmath=True)
+def compute_lunar_phase_angle(sun_lon_deg, moon_lon_deg):
+    """ Calculates the physical phase angle of a planetary body. """
+    
+    """ HAPPY PATH: Normalize the longitudinal difference to 360 circle """
+    phase_angle = (moon_lon_deg - sun_lon_deg) % 360.0
+    
+    """ GUARD 1: Prevent negative angles """
+    if phase_angle < 0.0:
+        phase_angle += 360.0
+        
+    return phase_angle
+
+
+@njit(fastmath=True)
+def compute_illumination_fraction(phase_angle_deg):
+    """ Calculates the percentage of the planetary disk reflecting sunlight. """
+    
+    """ GUARD 1: Full phase """
+    if phase_angle_deg == 180.0:
+        return 1.0
+        
+    """ GUARD 2: New phase """
+    if phase_angle_deg == 0.0 or phase_angle_deg == 360.0:
+        return 0.0
+        
+    """ HAPPY PATH: F = 0.5 * (1 - cos(phase_angle)) """
+    phase_rad = math.radians(phase_angle_deg)
+    illumination = 0.5 * (1.0 - math.cos(phase_rad))
+    return illumination
+
+
+@njit(fastmath=True)
+def compute_celestial_distance_au(parallax_arcsec):
+    """ Converts astronomical parallax into physical distance (Astronomical Units). """
+    
+    """ GUARD 1: Prevent division by zero or infinite distances """
+    if parallax_arcsec <= 0.0001:
+        return 999999.0
+        
+    """ HAPPY PATH: Distance in parsecs = 1 / parallax, convert to AU """
+    distance_parsecs = 1.0 / parallax_arcsec
+    distance_au = distance_parsecs * 206265.0
+    return distance_au
+
+
+@njit(fastmath=True)
+def compute_equatorial_to_cartesian(ra_deg, dec_deg, distance_au):
+    """ Converts Right Ascension and Declination into 3D J2000 spatial coordinates. """
+    
+    """ GUARD 1: Unmeasured deep-space object """
+    if distance_au >= 999998.0:
+        return 0.0, 0.0, 0.0
+        
+    """ HAPPY PATH: Spherical to Cartesian projection """
+    ra_rad = math.radians(ra_deg)
+    dec_rad = math.radians(dec_deg)
+    
+    x = distance_au * math.cos(dec_rad) * math.cos(ra_rad)
+    y = distance_au * math.cos(dec_rad) * math.sin(ra_rad)
+    z = distance_au * math.sin(dec_rad)
+    
+    return x, y, z
+
+""" ===================================================================== """
+""" --- THE ORCHESTRATOR (THE ASTROMETRIC MANAGER) --- """
+""" ===================================================================== """
+
+class GalacticTelemetryEngine:
+    """ Manages deep-space observation tracking and coordinates for the FSM. """
+    
+    def __init__(self):
+        """ 15-Decimal Default Baselines """
+        self.AU_TO_METERS = 149597870700.000000000000000
+
+    def process_lunar_telemetry(self, sun_longitude, moon_longitude):
+        """ Calculates live lunar illumination for dark-sky mission planning. """
+        
+        phase_angle = compute_lunar_phase_angle(float(sun_longitude), float(moon_longitude))
+        illumination = compute_illumination_fraction(float(phase_angle))
+        
+        """ Categorize phase via Else-Less Overrides """
+        phase_name = "WANING_CRESCENT"
+        
+        if phase_angle < 180.0: phase_name = "WAXING_GIBBOUS"
+        if phase_angle < 90.0: phase_name = "WAXING_CRESCENT"
+        if phase_angle > 180.0: phase_name = "WANING_GIBBOUS"
+        
+        if phase_angle == 0.0: phase_name = "NEW_MOON"
+        if phase_angle == 90.0: phase_name = "FIRST_QUARTER"
+        if phase_angle == 180.0: phase_name = "FULL_MOON"
+        if phase_angle == 270.0: phase_name = "LAST_QUARTER"
+        
+        payload = {
+            "lunar_phase_angle_deg": round(float(phase_angle), 15),
+            "illumination_fraction": round(float(illumination), 15),
+            "phase_classification": phase_name
+        }
+        
+        """ Broadcast to environmental bus (impacts optical sensor confidence in the dark) """
+        telemetry_link.update_global_state("environment", "lunar_illumination", payload)
+        return payload
+
+    def process_deep_space_tracking(self, target_id, ra_deg, dec_deg, parallax_arcsec):
+        """ Converts telescopic data into physical spatial intercept coordinates. """
+        
+        dist_au = compute_celestial_distance_au(float(parallax_arcsec))
+        x_au, y_au, z_au = compute_equatorial_to_cartesian(float(ra_deg), float(dec_deg), float(dist_au))
+        
+        """ Scale to standard mission meters """
+        x_m = x_au * self.AU_TO_METERS
+        y_m = y_au * self.AU_TO_METERS
+        z_m = z_au * self.AU_TO_METERS
+        
+        payload = {
+            "target_id": str(target_id),
+            "distance_au": round(float(dist_au), 15),
+            "j2000_vector_m": [round(float(x_m), 15), round(float(y_m), 15), round(float(z_m), 15)]
+        }
+        
+        """ Broadcast to navigation bus so WaypointManager can track deep-space intercepts """
+        telemetry_link.update_global_state("navigation", "active_space_target", payload)
+        return payload
+
 class GalacticFlightTracker:
     """
     Translates standard terrestrial GPS/Avionics telemetry into 
