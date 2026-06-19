@@ -126,6 +126,33 @@ class RootWaypointManager:
         self.airport_db = self._load_airport_database(airport_db_path)
         #self.geo_engine = WaypointManager()
         #self.airport_db = {"KSEA": {"center_lat": 47.4489, "center_lon": -122.3093, "runways": {"16L/34R": {"heading": 340.0, "length_feet": 11901.0}}}}
+        # Cache for managing internal aircraft data types
+        self.active_aircraft_perf = {
+            "light":      np.array([1000.0, 1500.0, 3.0], dtype=np.float64),  # [MaxClimb, MaxDescent, GlideAngle]
+            "medium":     np.array([2500.0, 3000.0, 3.0], dtype=np.float64),
+            "heavy":      np.array([4000.0, 4500.0, 3.0], dtype=np.float64),
+            "military":   np.array([9000.0, 8000.0, 4.5], dtype=np.float64)   # Tactical high-performance specs
+        }
+
+    def pipe_holding_altitude_to_jit_loop(self, current_altitude, current_speed, selected_faa_level, weight_category="medium"):
+        """
+        Extracts complex Python configuration types and feeds them directly 
+        as primitive, continuous float64 parameters into Numba's memory space.
+        """
+        # 1. Unpack aircraft telemetry into a strict 1D NumPy array format
+        current_state_array = np.array([0.0, 0.0, current_altitude, current_speed], dtype=np.float64)
+        
+        # 2. Select matching structural performance arrays
+        perf_limits = self.active_aircraft_perf.get(weight_category.lower(), self.active_aircraft_perf["medium"])
+        
+        # 3. Direct pass down across boundaries into the accelerated compiled code block
+        commanded_vs, altitude_error = compute_jit_vertical_guidance(
+            current_state=current_state_array,
+            target_altitude=float(selected_faa_level),
+            performance_limits=perf_limits
+        )
+        
+        return commanded_vs, altitude_error
 
     def initialize_dimension_aware_hold(self, airport_id, rwy_id, raw_adsb_feed):
         """
