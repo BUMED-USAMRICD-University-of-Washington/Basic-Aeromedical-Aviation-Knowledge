@@ -167,6 +167,52 @@ class RootWaypointManager:
             center_lon=apt["center_lon"]
         )
 
+    def _load_mock_db(self):
+        return {"KSEA": {"center_lat": 47.4489, "center_lon": -122.3093, "runways": {"16L/34R": {"heading": 160.0, "length_feet": 11901.0}}}}
+
+    def interactive_holding_initialization(self, airport_id, rwy_id, raw_adsb_feed):
+        """
+        Interactive checklist method. Queries crew specifications, showcases 
+        7 clear airspace vectors, and maps flight profiles based on operational priority.
+        """
+        print(f"\n========================================================")
+        print(f" INITIALIZING TOP-PRIORITY WAYPOINT PROFILE FOR: {airport_id}")
+        print(f"========================================================")
+        
+        # Step 1: Scan and render the top 7 traffic-free tiers
+        apt = self.airport_db[airport_id]
+        clear_zones = self.geo_engine.find_top_7_traffic_free_blocks(raw_adsb_feed, apt["center_lat"], apt["center_lon"])
+        
+        print("\n[LIVE MONITOR] TOP 7 TRAFFIC-FREE AVAILABLE HOLDING ALTITUDES:")
+        for idx, zone in enumerate(clear_zones, 1):
+            print(f"  Selection {idx} -> {zone['altitude_ft']} ft | Status: {zone['status']} | Threat Vector Score: {zone['congestion_score']}")
+
+        # Step 2: Interactive Interview Prompts (Can be wired directly to GUI or CLI input strings)
+        print("\n--- REQUIRED MISSION ASSIGNMENT SPECIFICATIONS ---")
+        
+        # User input simulation hooks
+        selected_index = int(input("Select holding altitude option (1-7): ") or "1")
+        chosen_altitude = clear_zones[selected_index - 1]["altitude_ft"]
+        
+        plane_class = input("Enter your Aircraft Category (military/law/gov/commercial/civil): ").lower() or "military"
+        is_emergency = input("Is this flight executing an Emergency Priority Override? (y/n): ").lower() == "y"
+        
+        print(f"\n[SUCCESS] Profile mapped. Assigned Holding Level: {chosen_altitude} feet MSL.")
+        
+        # Emergency priority overrides skip speed caps completely
+        if is_emergency or plane_class == "military":
+            max_holding_ias = "UNRESTRICTED (Tactical Priority Override Engaged)"
+        else:
+            max_holding_ias = f"{200 if chosen_altitude <= 6000 else 230} Knots IAS"
+            
+        return {
+            "target_altitude": chosen_altitude,
+            "aircraft_category": plane_class,
+            "emergency_priority": is_emergency,
+            "max_legal_speed_restriction": max_holding_ias,
+            "all_evaluated_clear_zones": clear_zones
+        }
+
     def update_holding_altitude_mid_flight(self, new_altitude, source="pilot"):
         """
         Allows the pilot or an automated ATC command parser to change 
