@@ -289,5 +289,9 @@ def start(
     console = AviationConsole(mode=mode, target=target)
     console.run()
 if __name__ == "__main__":
+    render_glass_cockpit()
+    """ Automatic refresh handler for dashboard telemetry simulation """
+    time.sleep(1.0)
+    st.rerun()
     logging.basicConfig(filename="flight_system.log", level=logging.ERROR)
     app()
