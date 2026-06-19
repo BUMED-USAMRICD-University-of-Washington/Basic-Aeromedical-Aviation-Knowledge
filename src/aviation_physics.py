@@ -152,6 +152,90 @@ def compute_jit_3d_unified_guidance(current_state, horizontal_waypoint, target_a
     
     return output_vector
 @njit
+def compute_jit_wind_shear_turn_correction(current_state, wind_vector, last_wind_vector, dt, base_perf_limits):
+    """
+    JIT-accelerated Wind Shear Tracking and Turn Radius Adjuster.
+    Monitors crosswind velocity shifts mid-pattern and dynamically rescales turn geometry.
+    
+    Parameters:
+        current_state (float64[:]): [lat, lon, altitude_ft, tas_kts, heading_deg]
+        wind_vector (float64[:]): [wind_direction_deg, wind_speed_kts]
+        last_wind_vector (float64[:]): [last_wind_direction_deg, last_wind_speed_kts]
+        dt (float64): Time delta since last sample frame (seconds)
+        base_perf_limits (float64[:]): [max_climb_fpm, max_descent_fpm, optimal_glide_deg, max_safe_bank_deg]
+        
+    Returns:
+        float64[:]: Dynamic Turn Telemetry Packet:
+                    [wind_shear_gradient_kts_per_sec, dynamic_turn_radius_meters, commanded_bank_angle_deg, emergency_override_flag]
+    """
+    # 1. Parse Input States
+    _, _, _, cur_tas, cur_hdg = current_state
+    wind_dir, wind_spd = wind_vector
+    last_wind_dir, last_wind_spd = last_wind_vector
+    max_safe_bank = base_perf_limits[3]
+    
+    tas_ms = cur_tas * 0.51444  # Knots to m/s
+    g = 9.81
+    
+    # 2. Convert Wind Vectors to Cartesian Components to Calculate Linear Vector Shear
+    w_dir_rad = np.radians(wind_dir)
+    w_x = wind_spd * np.sin(w_dir_rad)
+    w_y = wind_spd * np.cos(w_dir_rad)
+    
+    lw_dir_rad = np.radians(last_wind_dir)
+    lw_x = last_wind_spd * np.sin(lw_dir_rad)
+    lw_y = last_wind_spd * np.cos(lw_dir_rad)
+    
+    # Compute True Wind Shear Gradient (Magnitude of Vector Change over Time)
+    dw_x = (w_x - lw_x) / dt
+    dw_y = (w_y - lw_y) / dt
+    shear_gradient_kts_sec = np.sqrt(dw_x**2 + dw_y**2)
+    
+    # 3. Compute Instantaneous Groundspeed Crosswind and Headwind Components
+    hdg_rad = np.radians(cur_hdg)
+    # Target groundspeed approximation under current wind slice
+    v_cross = wind_spd * np.sin(np.radians(wind_dir - cur_hdg))
+    v_head = wind_spd * np.cos(np.radians(wind_dir - cur_hdg))
+    
+    # Instantaneous groundspeed relative to the track
+    v_ground_ms = max(10.0, (cur_tas - v_head) * 0.51444) 
+    
+    # 4. Standard Nominal Turn Geometry (3 deg/sec standard rate target)
+    omega_standard = np.radians(3.0)
+    nominal_radius = tas_ms / omega_standard
+    
+    # Calculate bank angle required to hold nominal path under current groundspeed conditions
+    required_bank = np.degrees(np.arctan((v_ground_ms * omega_standard) / g))
+    
+    # 5. Wind Shear Compensation Adjustment Loop
+    emergency_override = 0.0
+    dynamic_radius = nominal_radius
+    
+    # If wind shear gradient breaks a 2.0 knot/sec severity threshold
+    if shear_gradient_kts_sec > 2.0:
+        # Predict kinetic energy offset over the turn segment
+        shear_accel_ms2 = shear_gradient_kts_sec * 0.51444
+        
+        # Adjust required bank angle to counteract centrifugal drift from velocity surges
+        adjusted_bank_rad = np.arctan(((v_ground_ms**2) / (g * nominal_radius)) + (shear_accel_ms2 / g))
+        required_bank = np.degrees(adjusted_bank_rad)
+        
+        # Airframe Structural Safety Check: If required bank exceeds safe structural limits
+        if required_bank > max_safe_bank:
+            required_bank = max_safe_bank
+            # Force-expand the protected holding pattern radius to prevent a high-load factor stall
+            dynamic_radius = (v_ground_ms**2) / (g * np.tan(np.radians(max_safe_bank)))
+            emergency_override = 1.0  # Assert warning flag to avionics bus
+            
+    # Pack Output Array
+    out = np.empty(4, dtype=np.float64)
+    out[0] = shear_gradient_kts_sec
+    out[1] = dynamic_radius
+    out[2] = required_bank
+    out[3] = emergency_override
+    return out
+    
+@njit
 def compute_next_guidance_vector(current_state, waypoint_array):
     """
     JIT-accelerated guidance loop. Computes error vectors at 1000Hz.
