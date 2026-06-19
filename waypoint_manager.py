@@ -9,7 +9,9 @@ import json
 import telemetry_link
 from pydantic import BaseModel, Field, ValidationError
 from atmospheric_entry_controller import EntryController
-
+from aviation_physics import compute_jit_3d_and_fuel_metrics
+from export_telemetry import encode_to_1553b_avionics_bus
+from ai_pirep import verbalize_copilot_fuel_announcement
 """ --- HARDWARE ABSTRACTION LAYER (HAL) --- """
 try:
     import cupy as xp
@@ -274,7 +276,69 @@ class RootWaypointManager:
             "assigned_holding_altitude": 5000, # Default safe baseline entry
             "atc_override_active": False
         }
+    def execute_unified_system_pass(self, ac_telemetry, target_wp, assigned_faa_alt, wind_profile, fuel_telemetry):
+        """
+        Executes a single fully unified system loop pass.
+        Math is JIT-accelerated, outputs are sent to the 1553B bus, and audio is prioritized.
+        """
+        # 1. Unpack aircraft telemetry into primitive float64 data arrays
+        current_state = np.array([ac_telemetry["lat"], ac_telemetry["lon"], ac_telemetry["alt_ft"], ac_telemetry["tas_kts"], ac_telemetry["hdg_deg"]], dtype=np.float64)
+        horizontal_wp = np.array([target_wp["lat"], target_wp["lon"]], dtype=np.float64)
+        wind_vector   = np.array([wind_profile["dir_deg"], wind_profile["spd_kts"]], dtype=np.float64)
+        fuel_state    = np.array([fuel_telemetry["current_lbs"], fuel_telemetry["diversion_lbs"], fuel_telemetry["current_bank_deg"]], dtype=np.float64)
+        
+        perf_limits = self.PERF_MAP.get(ac_telemetry["class"].lower(), self.PERF_MAP["medium"])
 
+        # 2. RUN HIGH-SPEED JIT EXECUTION PASS
+        jit_metrics_bus = compute_jit_3d_and_fuel_metrics(
+            current_state=current_state,
+            horizontal_waypoint=horizontal_wp,
+            target_altitude=float(assigned_faa_alt),
+            performance_limits=perf_limits,
+            wind_vector=wind_vector,
+            fuel_state=fuel_state
+        )
+
+        # 3. CONVERT AND STREAM RAW BINARY TO MIL-STD-1553B BUS
+        binary_1553b_word_packet = encode_to_1553b_avionics_bus(jit_metrics_bus)
+        
+        # 4. DISPATCH SYNTHESIZED CO-PILOT RADIO CHECK OUTBOUND
+        endurance_mins = jit_metrics_bus[5]
+        is_critical = (endurance_mins <= 5.0)
+        
+        verbalize_copilot_fuel_announcement(
+            endurance_minutes=endurance_mins,
+            fuel_flow_pph=jit_metrics_bus[3],
+            bingo_threshold=jit_metrics_bus[4],
+            is_critical=is_critical
+        )
+
+        return {
+            "raw_1553b_binary_stream": binary_1553b_word_packet,
+            "vertical_speed_command": jit_metrics_bus[0],
+            "crab_heading_command": jit_metrics_bus[1],
+            "hold_endurance_remaining_minutes": endurance_mins
+        }
+
+# Execution Test Harness
+if __name__ == "__main__":
+    manager = RootWaypointManager()
+    
+    # Input datasets simulating normal holding operations
+    aircraft = {"class": "medium", "lat": 47.448, "lon": -122.309, "alt_ft": 9000.0, "tas_kts": 180.0, "hdg_deg": 340.0}
+    waypoint = {"lat": 47.474, "lon": -122.296}
+    wind     = {"dir_deg": 270.0, "spd_kts": 25.0}
+    fuel     = {"current_lbs": 4800.0, "diversion_lbs": 1500.0, "current_bank_deg": 15.0}
+    faa_alt  = 6000.0 # Sliced level
+    
+    # Fire unified system loop pass
+    bus_result = manager.execute_unified_system_pass(aircraft, waypoint, faa_alt, wind, fuel)
+    
+    print("\n----------------- LIVE CONSOLE TELEMETRY BUS VERIFICATION -------------")
+    print(f"Hex Bus Output String : {bus_result['raw_1553b_binary_stream'].hex().upper()}")
+    print(f"JIT Autopilot VS Rate : {bus_result['vertical_speed_command']:.1f} FPM")
+    print(f"JIT Autopilot Heading : {bus_result['crab_heading_command']:.2f}°")
+    print(f"Minutes to Bingo Fuel : {bus_result['hold_endurance_remaining_minutes']:.1f} Mins")
     def _load_airport_database(self, path):
         """Loads planetary-anchored airport data tied to Stellarium objects."""
         if os.path.exists(path):
