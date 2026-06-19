@@ -1,6 +1,7 @@
 """ waypoint_manager.py """
 """ Multi-Domain Waypoint Manager, FSM Tracker, & Intercept Guidance """
 """ Optimized: Else-Less Guard Clauses | 15-Decimal Precision | Numba Kernels """
+import sys
 import math
 import multiprocessing as mp
 import os
@@ -103,6 +104,149 @@ class VehicleSpecs(BaseModel):
 """ ===================================================================== """
 """ --- THE ORCHESTRATOR (THE MANAGER) --- """
 """ ===================================================================== """
+"""
+Root Waypoint Manager Facade.
+Orchestrates high-level automation requests, maps system inputs to low-level 
+geometric models inside src/, and interfaces directly with database and simulation loops.
+"""
+
+# Ensure project src directory is available in the path context
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+
+# Import the foundational mathematical engine we just updated
+from waypoint_manager import WaypointManager as GeometricEngine
+
+class RootWaypointManager:
+    def __init__(self, airport_db_path="src/airports_db.json"):
+        self.geo_engine = GeometricEngine()
+        self.airport_db = self._load_airport_database(airport_db_path)
+
+    def _load_airport_database(self, path):
+        """Loads planetary-anchored airport data tied to Stellarium objects."""
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                return json.load(f)
+        # Fallback Mock Structure if database needs construction
+        return {
+            "KSEA": {
+                "name": "Seattle-Tacoma International",
+                "center_lat": 47.4489,
+                "center_lon": -122.3093,
+                "runways": {
+                    "16L/34R": {"heading": 160.0, "length_feet": 11901.0},
+                    "16C/34C": {"heading": 160.0, "length_feet": 9426.0},
+                    "16R/34L": {"heading": 160.0, "length_feet": 8500.0}
+                }
+            }
+        }
+
+    def process_airport_arrival(self, airport_id, rwy_id, aircraft_heading, tas_knots, wind_speed, wind_dir, mode="land", holding_is_standard=True):
+        """
+        High-level orchestration entry point called by the flight UI or telemetry loop.
+        
+        Parameters:
+            airport_id (str): ICAO identifier (e.g., 'KSEA')
+            rwy_id (str): User-selected runway string (e.g., '16L/34R')
+            aircraft_heading (float): Current arrival track heading
+            tas_knots (float): True Airspeed
+            wind_speed (float): Predicted wind velocity at landing
+            wind_dir (float): Meteorological wind heading source
+            mode (str): Execution path selection -> "land" for touchdown zone tracking, "hold" for patterns.
+            holding_is_standard (bool): True for standard right turns, False for left turns.
+        """
+        if airport_id not in self.airport_db:
+            raise ValueError(f"Airport identifier '{airport_id}' not found in configuration files.")
+            
+        apt_data = self.airport_db[airport_id]
+        if rwy_id not in apt_data["runways"]:
+            raise ValueError(f"Runway '{rwy_id}' does not exist at {airport_id}.")
+
+        rwy_info = apt_data["runways"][rwy_id]
+        
+        # 1. Dynamically evaluate the runway wind-vectors and select the safest side
+        runway_evaluation = self.geo_engine.determine_best_runway(
+            rwy_heading=rwy_info["heading"],
+            total_length=rwy_info["length_feet"],
+            wind_speed=wind_speed,
+            wind_dir=wind_dir,
+            center_lat=apt_data["center_lat"],
+            center_lon=apt_data["center_lon"]
+        )
+        
+        # 2. Extract bounding endpoints to determine the touchdown target vector
+        threshold_pos = runway_evaluation["threshold"]
+        opposite_pos = runway_evaluation["opposite_threshold"]
+        
+        # 3. Handle Mode Executions
+        if mode == "land":
+            # Generate the exact 1,000-ft past threshold vector point rather than center drop
+            td_lat, td_lon = self.geo_engine.generate_touchdown_point(
+                threshold_lat=threshold_pos[0], threshold_lon=threshold_pos[1],
+                runway_heading=runway_evaluation["heading"],
+                opposite_lat=opposite_pos[0], opposite_lon=opposite_pos[1]
+            )
+            
+            arrival_points = [
+                {"label": "APPROACH_ENTRY", "lat": threshold_pos[0], "lon": threshold_pos[1]},
+                {"label": "TOUCHDOWN_MARK", "lat": td_lat, "lon": td_lon}
+            ]
+            pattern_type = "Straight-In Precision Approach"
+            
+        elif mode == "hold":
+            # 4. Automate FAA sector entry selection
+            pattern_type = self.geo_engine.calculate_holding_entry(
+                aircraft_heading=aircraft_heading,
+                inbound_course=runway_evaluation["heading"],
+                is_standard=holding_is_standard
+            )
+            
+            # 5. Build coordinate array blocks for the hold sequence over the threshold
+            arrival_points = self.geo_engine.generate_holding_pattern_waypoints(
+                fix_lat=threshold_pos[0], fix_lon=threshold_pos[1],
+                inbound_course=runway_evaluation["heading"],
+                tas_knots=tas_knots, wind_speed=wind_speed, wind_dir=wind_dir,
+                entry_type=pattern_type, is_standard=holding_is_standard
+            )
+        else:
+            raise ValueError(f"Unknown operations mode: {mode}")
+
+        # 6. Apply distance kinematics to resolve arrival projections
+        target_dest = arrival_points[-1]
+        ete_minutes = self.geo_engine.estimate_arrival_time(
+            current_lat=apt_data["center_lat"] + 0.1, # Arbitrary offset representing current aircraft state
+            current_lon=apt_data["center_lon"] - 0.1,
+            target_lat=target_dest["lat"], target_lon=target_dest["lon"],
+            tas_knots=tas_knots, wind_speed=wind_speed, wind_dir=wind_dir
+        )
+        
+        # Comprehensive telemetry telemetry pack returned to flight controller systems
+        return {
+            "airport": airport_id,
+            "selected_runway_side": runway_evaluation["side"],
+            "landing_magnetic_heading": runway_evaluation["heading"],
+            "resolved_pattern_type": pattern_type,
+            "calculated_headwind_knots": runway_evaluation["headwind"],
+            "calculated_crosswind_knots": runway_evaluation["crosswind"],
+            "estimated_time_enroute_minutes": ete_minutes,
+            "generated_waypoint_stack": arrival_points
+        }
+
+# Sample testing implementation execution
+if __name__ == "__main__":
+    root_manager = RootWaypointManager()
+    
+    # Simulate a user requesting a holding pattern arrival configuration
+    telemetry_output = root_manager.process_airport_arrival(
+        airport_id="KSEA",
+        rwy_id="16L/34R",
+        aircraft_heading=210.0, # Approach track heading
+        tas_knots=150.0,
+        wind_speed=22.0,
+        wind_dir=340.0,         # Strong wind out of the NNW
+        mode="hold"             # Options: "hold" or "land"
+    )
+    
+    print(json.dumps(telemetry_output, indent=4))
 
 class WaypointManager:
     @njit(fastmath=True)
