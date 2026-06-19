@@ -4,6 +4,17 @@ class WaypointManager:
     def __init__(self):
         # Earth parameters for coordinate conversion (meters per degree latitude)
         self.LAT_METERS = 111132.95
+        
+        # Priority Coefficients dictionary mapped for structural spacing math
+        self.PRIORITY_COEFFS = {
+            "military":  {"omega": 0.20, "psi": 0.00},
+            "law":       {"omega": 0.25, "psi": 0.00},
+            "gov":       {"omega": 0.40, "psi": 0.50},
+            "commercial":{"omega": 0.60, "psi": 1.00},
+            "freight":   {"omega": 0.80, "psi": 1.00},
+            "us_mail":   {"omega": 1.00, "psi": 1.00},
+            "civil":     {"omega": 1.50, "psi": 2.00}
+        }
     def analyze_adsb_traffic_density(self, adsb_raw_data, center_lat, center_lon, radius_nm=15.0):
         """
         Parses live ADS-B state vectors within a specific radius of the airport.
@@ -43,6 +54,67 @@ class WaypointManager:
             "recommended_clean_altitude": best_altitude,
             "traffic_at_recommendation": altitude_blocks[best_altitude]
         }
+    
+    def find_top_7_traffic_free_blocks(self, adsb_raw_data, center_lat, center_lon, radius_nm=15.0):
+        """
+        Scans live traffic and tracks exactly which 1,000-ft altitude slots 
+        from 2,000 to 15,000 feet contain zero or the fewest aircraft.
+        Returns up to 7 options sorted by safety/clarity score.
+        """
+        # Define available holding bands
+        valid_tiers = range(2000, 16000, 1000)
+        altitude_scores = {alt: 0.0 for alt in valid_tiers}
+        aircraft_counts = {alt: 0 for alt in valid_tiers}
+        
+        lon_meters = 111412.84 * np.cos(np.radians(center_lat))
+        
+        for aircraft in adsb_raw_data.get("ac", []):
+            ac_lat = aircraft.get("lat")
+            ac_lon = aircraft.get("lon")
+            ac_alt = aircraft.get("alt_baro")
+            # Map intruder to operational category (defaults to civil GA if missing)
+            ac_cat = aircraft.get("category", "civil").lower()
+            
+            if ac_lat is None or ac_lon is None or ac_alt is None:
+                continue
+                
+            # Distance vectors
+            d_lat = (ac_lat - center_lat) * self.LAT_METERS
+            d_lon = (ac_lon - center_lon) * lon_meters
+            dist_nm = np.sqrt(d_lat**2 + d_lon**2) / 1852.0 # convert to NM
+            
+            if dist_nm <= radius_nm:
+                # Apply priority spacing modifier calculation
+                coeffs = self.PRIORITY_COEFFS.get(ac_cat, {"omega": 1.50, "psi": 2.00})
+                effective_h_limit = 3.0 * (1.0 + coeffs["omega"])
+                
+                # Check which holding tiers this intruder corrupts vertically
+                for tier in valid_tiers:
+                    v_diff = abs(ac_alt - tier)
+                    effective_v_limit = 1000 * (1.0 + coeffs["psi"])
+                    
+                    # If aircraft breaches safety footprint, penalize the score of that tier
+                    if dist_nm <= effective_h_limit and v_diff <= effective_v_limit:
+                        aircraft_counts[tier] += 1
+                        # Closer targets with high-priority penalties spike the score (lower is clearer)
+                        altitude_scores[tier] += (10.0 / (dist_nm + 0.1)) * (1.0 + coeffs["omega"])
+
+        # Sort tiers based on density/threat scores, then alphabetically by altitude
+        sorted_tiers = sorted(valid_tiers, key=lambda x: (altitude_scores[x], aircraft_counts[x], x))
+        
+        # Package the top 7 cleanest altitude configurations
+        top_7_options = []
+        for alt in sorted_tiers[:7]:
+            status = "COMPLETELY OPEN" if aircraft_counts[alt] == 0 else f"CONGESTED ({aircraft_counts[alt]} targets nearby)"
+            top_7_options.append({
+                "altitude_ft": alt,
+                "congestion_score": round(altitude_scores[alt], 2),
+                "aircraft_count": aircraft_counts[alt],
+                "status": status
+            })
+            
+        return top_7_options
+        
     def get_runway_ends(self, center_lat, center_lon, true_heading, total_length_feet):
         """
         Calculates the geographic coordinates of both thresholds of a runway.
