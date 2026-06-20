@@ -1,10 +1,12 @@
 """ collision_avoidance_app.py """
 """ NextGen ACAS X & ADS-B Cooperative Collision Avoidance Engine """
 """ Optimized: Else-Less Guard Clauses | 15-Decimal Precision | Numba Kernels """
-
+import time
 import math
 import telemetry_link
 from intent_engine import IntruderIntentAnalyst
+from pathlib import Path
+from terrain_manager import AviationTerrainEngine
 
 """ --- HARDWARE ABSTRACTION LAYER (HAL) --- """
 try:
@@ -16,8 +18,83 @@ except ImportError:
     from numba import njit
     HAS_GPU = False
 
+# Point this relative to your structural source deployment framework location
+# Targets: E:\GitHub\Basic-Aviation-Knowledge\src\earth\h5
+EARTH_H5_ROOT = Path(__file__).resolve().parent / "earth" / "h5"
+
+class GroundCollisionAvoidanceSystem:
+    """
+    Flight deck advisory computer layer. Matches vehicle telemetry metrics 
+    against high-performance H5 digital elevation grids.
+    """
+    def __init__(self, data_path: Path):
+        print("[GCAS INIT] Coupling system threads with terrain database core...")
+        self.terrain_engine = AviationTerrainEngine(str(data_path))
+        
+        # Safety margin envelopes (In Meters)
+        self.CAUTION_AGL_THRESHOLD = 300.0  # Alert below ~1,000 feet Above Ground Level
+        self.WARNING_AGL_THRESHOLD = 150.0  # Critical threat below ~500 feet Above Ground Level
+
+    def monitor_flight_telemetry(self, lat: float, lon: float, altitude_msl: float):
+        """
+        Primary execution node. Call this parameter loop inside your vehicle's core flight updates.
+        Returns state tracking maps alongside clearance indicators.
+        """
+        # 1. Update terrain tile layer allocations automatically
+        self.terrain_engine.update_aircraft_position(lat, lon)
+        
+        # 2. Extract precise ground point elevation bounds
+        ground_elevation = self.terrain_engine.get_ground_elevation(lat, lon)
+        
+        # 3. Compute structural separation properties
+        altitude_agl = altitude_msl - ground_elevation
+        
+        # 4. Process critical separation assessment states
+        if altitude_agl <= self.WARNING_AGL_THRESHOLD:
+            status = "CRITICAL PULL UP WARNING"
+            alert_level = 2
+        elif altitude_agl <= self.CAUTION_AGL_THRESHOLD:
+            status = "TERRAIN PROXIMITY CAUTION"
+            alert_level = 1
+        else:
+            status = "NORMAL SEPARATION OPERATIONAL"
+            alert_level = 0
+            
+        return {
+            "status": status,
+            "alert_level": alert_level,
+            "ground_m": round(ground_elevation, 1),
+            "clearance_m": round(altitude_agl, 1)
+        }
+
+# =====================================================================
+# SYSTEM VERIFICATION WORKER
+# =====================================================================
+if __name__ == "__main__":
+    # Instantiate simulation environment lines
+    gcas_computer = GroundCollisionAvoidanceSystem(EARTH_H5_ROOT)
+    
+    # Mock Flight telemetry tracking a descent vector into mountainous terrain boundaries
+    simulated_telemetry_stream = [
+        {"lat": 47.606, "lon": -122.332, "alt_msl": 600.0},  # Transitioning past coastlines
+        {"lat": 47.450, "lon": -121.800, "alt_msl": 500.0},  # Entering mountain approaches
+        {"lat": 47.442, "lon": -121.750, "alt_msl": 420.0}   # Severe risk proximity threat point
+    ]
+    
+    print("\n[SIMULATION START] Beginning automated flight loop tracking processing passes...")
+    for index, packet in enumerate(simulated_telemetry_stream, start=1):
+        telemetry = gcas_computer.monitor_flight_telemetry(
+            packet["lat"], packet["lon"], packet["alt_msl"]
+        )
+        
+        print(f"\n[FRAME {index:02d}] Position: ({packet['lat']}, {packet['lon']}) | Aircraft Altitude: {packet['alt_msl']}m")
+        print(f"   Terrain Elevation: {telemetry['ground_m']}m | Vertical Clearance AGL: {telemetry['clearance_m']}m")
+        print(f"   System Status Advisory Flags: [{telemetry['status']}]")
+        
+        time.sleep(0.5)
+
 """ ===================================================================== """
-""" --- PURE MATH KERNELS (THE BASEMENT MATHEMATICIANS) --- """
+""" --- PURE MATH KERNELS (THE AVIATION MATHEMATICIANS) --- """
 """ ===================================================================== """
 
 @njit(fastmath=True)
